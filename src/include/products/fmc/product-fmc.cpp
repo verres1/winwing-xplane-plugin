@@ -3,10 +3,11 @@
 #include "appstate.h"
 #include "config.h"
 #include "dataref.h"
+#include "profiles/ff767-fmc-profile.h"
 #include "profiles/ff777-fmc-profile.h"
 #include "profiles/ixeg733-fmc-profile.h"
-#include "profiles/ff767-fmc-profile.h"
 #include "profiles/laminar-airbus-fmc-profile.h"
+#include "profiles/rotatemd11-fmc-profile.h"
 #include "profiles/ssg748-fmc-profile.h"
 #include "profiles/toliss-fmc-profile.h"
 #include "profiles/xcrafts-fmc-profile.h"
@@ -15,8 +16,8 @@
 #include <chrono>
 #include <XPLMProcessing.h>
 
-ProductFMC::ProductFMC(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName, FMCHardwareType hardwareType, unsigned char identifierByte) :
-    USBDevice(hidDevice, vendorId, productId, vendorName, productName), hardwareType(hardwareType), identifierByte(identifierByte) {
+ProductFMC::ProductFMC(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName, FMCHardwareType hardwareType, FMCDeviceVariant variant, unsigned char identifierByte) :
+    USBDevice(hidDevice, vendorId, productId, vendorName, productName), hardwareType(hardwareType), identifierByte(identifierByte), deviceVariant(variant) {
     profile = nullptr;
     page = std::vector<std::vector<char>>(ProductFMC::PageLines, std::vector<char>(ProductFMC::PageBytesPerLine, ' '));
     lastUpdateCycle = 0;
@@ -48,6 +49,10 @@ void ProductFMC::setProfileForCurrentAircraft() {
     } else if (ZiboFMCProfile::IsEligible()) {
         clearDisplay();
         profile = new ZiboFMCProfile(this);
+        profileReady = true;
+    } else if (RotateMD11FMCProfile::IsEligible()) {
+        clearDisplay();
+        profile = new RotateMD11FMCProfile(this);
         profileReady = true;
     } else if (FlightFactor767FMCProfile::IsEligible()) {
         debug("Using FlightFactor 757/767 PFP profile for %s.\n", classIdentifier());
@@ -156,7 +161,11 @@ void ProductFMC::update() {
     }
 
     USBDevice::update();
-    updatePage();
+
+    if (++displayUpdateFrameCounter >= DISPLAY_UPDATE_FRAME_INTERVAL) {
+        displayUpdateFrameCounter = 0;
+        updatePage();
+    }
 }
 
 void ProductFMC::didReceiveData(int reportId, uint8_t *report, int reportLength) {
@@ -201,50 +210,54 @@ void ProductFMC::didReceiveData(int reportId, uint8_t *report, int reportLength)
             pressed = (buttonsHi >> (i - 64)) & 1;
         }
 
-        bool pressedButtonIndexExists = pressedButtonIndices.find(i) != pressedButtonIndices.end();
-        XPLMCommandPhase command = -1;
-        if (pressed && !pressedButtonIndexExists) {
-            command = xplm_CommandBegin;
-        } else if (pressed && pressedButtonIndexExists) {
-            command = xplm_CommandContinue;
-        } else if (!pressed && pressedButtonIndexExists) {
-            command = xplm_CommandEnd;
-        }
+        didReceiveButton(i, pressed);
+    }
+}
 
-        if (command < 0) {
-            continue;
-        }
+void ProductFMC::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count) {
+    bool pressedButtonIndexExists = pressedButtonIndices.find(hardwareButtonIndex) != pressedButtonIndices.end();
+    XPLMCommandPhase command = -1;
+    if (pressed && !pressedButtonIndexExists) {
+        command = xplm_CommandBegin;
+    } else if (pressed && pressedButtonIndexExists) {
+        command = xplm_CommandContinue;
+    } else if (!pressed && pressedButtonIndexExists) {
+        command = xplm_CommandEnd;
+    }
 
-        if (command == xplm_CommandBegin) {
-            pressedButtonIndices.insert(i);
-        }
+    if (command < 0) {
+        return;
+    }
 
-        FMCKey key = FMCHardwareMapping::ButtonIdentifierForIndex(hardwareType, i);
-        const std::vector<FMCButtonDef> &currentButtonDefs = profile->buttonDefs();
-        auto it = std::find_if(currentButtonDefs.begin(), currentButtonDefs.end(), [&](const FMCButtonDef &def) {
-            return std::visit([&](auto &&k) {
-                using T = std::decay_t<decltype(k)>;
-                if constexpr (std::is_same_v<T, FMCKey>) {
-                    return k == key;
-                } else {
-                    return std::find(k.begin(), k.end(), key) != k.end();
-                }
-            },
-                              def.key);
-        });
-        if (it != currentButtonDefs.end()) {
-            profile->buttonPressed(&*it, command);
-        }
+    if (command == xplm_CommandBegin) {
+        pressedButtonIndices.insert(hardwareButtonIndex);
+    }
 
-        if (command == xplm_CommandEnd) {
-            pressedButtonIndices.erase(i);
-        }
+    FMCKey key = FMCHardwareMapping::ButtonIdentifierForIndex(hardwareType, hardwareButtonIndex);
+    const std::vector<FMCButtonDef> &currentButtonDefs = profile->buttonDefs();
+    auto it = std::find_if(currentButtonDefs.begin(), currentButtonDefs.end(), [&](const FMCButtonDef &def) {
+        return std::visit([&](auto &&k) {
+            using T = std::decay_t<decltype(k)>;
+            if constexpr (std::is_same_v<T, FMCKey>) {
+                return k == key;
+            } else {
+                return std::find(k.begin(), k.end(), key) != k.end();
+            }
+        },
+                          def.key);
+    });
+    if (it != currentButtonDefs.end()) {
+        profile->buttonPressed(&*it, command);
+    }
+
+    if (command == xplm_CommandEnd) {
+        pressedButtonIndices.erase(hardwareButtonIndex);
     }
 }
 
 void ProductFMC::updatePage() {
     auto datarefManager = Dataref::getInstance();
-    for (std::string dataref : profile->displayDatarefs()) {
+    for (const std::string &dataref : profile->displayDatarefs()) {
         if (!lastUpdateCycle || datarefManager->getCachedLastUpdate(dataref.c_str()) > lastUpdateCycle) {
             profile->updatePage(page);
             lastUpdateCycle = XPLMGetCycleNumber();
@@ -416,4 +429,9 @@ void ProductFMC::setLedBrightness(FMCLed led, uint8_t brightness) {
     }
 
     writeData({0x02, identifierByte, 0xbb, 0x00, 0x00, 0x03, 0x49, led, brightness, 0x00, 0x00, 0x00, 0x00, 0x00});
+}
+
+void ProductFMC::setDeviceVariant(FMCDeviceVariant variant) {
+    writeData({0x02, identifierByte, 0xbb, 0x00, 0x00, 0x04, 0x05, 0xcc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+    writeData({0x02, identifierByte, 0xbb, 0x00, 0x00, 0x08, 0x06, 0xcc, 0x00, 0x00, 0x01, static_cast<uint8_t>(variant), 0xff, 0xff});
 }

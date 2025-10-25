@@ -13,6 +13,7 @@ class ProductFCUEfis : public USBDevice {
         FCUEfisAircraftProfile *profile;
         FCUDisplayData displayData;
         int lastUpdateCycle;
+        int displayUpdateFrameCounter = 0;
         std::set<int> pressedButtonIndices;
         std::map<std::string, int> selectorPositions;
 
@@ -33,7 +34,8 @@ class ProductFCUEfis : public USBDevice {
         void disconnect() override;
         void update() override;
         void didReceiveData(int reportId, uint8_t *report, int reportLength) override;
-        void forceStateSync();
+        void didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count = 1) override;
+        void forceStateSync() override;
 
         void setLedBrightness(FCUEfisLed led, uint8_t brightness);
 

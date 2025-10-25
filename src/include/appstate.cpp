@@ -88,7 +88,7 @@ void AppState::update() {
 
     Dataref::getInstance()->update();
 
-    for (auto device : USBController::getInstance()->devices) {
+    for (auto *device : USBController::getInstance()->devices) {
         device->update();
     }
 }

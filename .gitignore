@@ -111,3 +111,6 @@ xcuserdata/
 # Claude Code configuration files
 CLAUDE.md
 .claude/
+
+#VSCode
+.vscode/

@@ -13,6 +13,7 @@ class ProductFMC : public USBDevice {
         FMCAircraftProfile *profile;
         std::vector<std::vector<char>> page;
         int lastUpdateCycle;
+        int displayUpdateFrameCounter = 0;
         std::set<int> pressedButtonIndices;
         uint64_t lastButtonStateLo;
         uint32_t lastButtonStateHi;
@@ -24,7 +25,7 @@ class ProductFMC : public USBDevice {
         void setProfileForCurrentAircraft();
 
     public:
-        ProductFMC(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName, FMCHardwareType hardwareType, unsigned char identifierByte);
+        ProductFMC(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName, FMCHardwareType hardwareType, FMCDeviceVariant variant, unsigned char identifierByte);
         ~ProductFMC();
 
         static constexpr unsigned int PageLines = 14; // Header + 6 * label + 6 * cont + textbox
@@ -33,6 +34,7 @@ class ProductFMC : public USBDevice {
         static constexpr unsigned int PageBytesPerLine = PageCharsPerLine * PageBytesPerChar;
         FMCHardwareType hardwareType;
         const unsigned char identifierByte;
+        const FMCDeviceVariant deviceVariant;
         bool fontUpdatingEnabled;
 
         const char *classIdentifier() override;
@@ -41,6 +43,8 @@ class ProductFMC : public USBDevice {
         void unloadProfile();
         void update() override;
         void didReceiveData(int reportId, uint8_t *report, int reportLength) override;
+        void didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count = 1) override;
+
         void writeLineToPage(std::vector<std::vector<char>> &page, int line, int pos, const std::string &text, char color, bool fontSmall = false);
         void setFont(std::vector<std::vector<unsigned char>> font);
 
@@ -49,6 +53,8 @@ class ProductFMC : public USBDevice {
 
         void clearDisplay();
         void showBackground(FMCBackgroundVariant variant);
+    
+        void setDeviceVariant(FMCDeviceVariant variant);
 };
 
 #endif
