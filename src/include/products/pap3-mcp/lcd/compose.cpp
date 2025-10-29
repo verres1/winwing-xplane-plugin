@@ -48,94 +48,99 @@ Payload build(const Snapshot& s) {
     // - If spd < 1.0f      => MACH given as real fraction (e.g. 0.6454).
     // In MACH: show only the two decimals ".xx" mapped to T/U, round using the 3rd decimal. MACH label + decimal dot.
     {
-        const float spd = s.spd;
+        if (s.showSpd) {
+            const float spd = s.spd;
 
-        auto round_half_up_to_int = [](float x) -> int {
-            return static_cast<int>(std::floor(x + 0.5f));
-        };
+            auto round_half_up_to_int = [](float x) -> int {
+                return static_cast<int>(std::floor(x + 0.5f));
+            };
 
-        const bool isMach = (spd < 100.0f); // both real Mach (<1) and Mach×100 (<100)
+            const bool isMach = (spd < 100.0f); // both real Mach (<1) and Mach×100 (<100)
 
-        if (isMach) {
-            // Normalize to a 0..1 Mach fraction.
-            float mach = 0.0f;
-            if (spd < 1.0f) {
-                // spd already is Mach (e.g. 0.6454)
-                mach = std::clamp(spd, 0.0f, 0.9999f);
+            if (isMach) {
+                // Normalize to a 0..1 Mach fraction.
+                float mach = 0.0f;
+                if (spd < 1.0f) {
+                    // spd already is Mach (e.g. 0.6454)
+                    mach = std::clamp(spd, 0.0f, 0.9999f);
+                } else {
+                    // spd is Mach×100 (e.g. 78 -> 0.78)
+                    mach = std::clamp(spd / 100.0f, 0.0f, 0.9999f);
+                }
+
+                // Take two decimals only, rounded with the 3rd decimal.
+                // ex: 0.786 -> 78 + (6>=5 ? +1 : +0) -> 79
+                const int twoDigits = std::clamp(round_half_up_to_int(mach * 1000.0f / 10.0f), 0, 99);
+                const int tens  = (twoDigits / 10) % 10;
+                const int units =  twoDigits % 10;
+
+                // Draw only T and U; K and H stay blank.
+                seg::drawDigit(seg::G0, p, seg::SPD_TENS,  tens);
+                seg::drawDigit(seg::G0, p, seg::SPD_UNITS, units);
+
+                // Labels and indicators
+                seg::setFlag(p, seg::OFF_36, seg::LBL_IAS,    false);
+                seg::setFlag(p, seg::OFF_32, seg::LBL_MACH_L, (true && s.lblIAS));
+                seg::setFlag(p, seg::OFF_2E, seg::LBL_MACH_R, (true && s.lblIAS));
+
+                // Bars unchanged
+                seg::setFlag(p, seg::OFF_22, seg::SPD_BAR_TOP,    s.spdBarTop);
+                seg::setFlag(p, seg::OFF_1E, seg::SPD_BAR_BOTTOM, s.spdBarBot);
+
+                // Decimal dot ON in MACH mode
+                seg::setFlag(p, seg::OFF_19, seg::DOT_SPD, true);
+
             } else {
-                // spd is Mach×100 (e.g. 78 -> 0.78)
-                mach = std::clamp(spd / 100.0f, 0.0f, 0.9999f);
+                // IAS mode: integer knots, round half-up.
+                const int ias = std::max(0, round_half_up_to_int(spd));
+                int k,h,t,u;
+                digits4(ias, k,h,t,u);
+
+                const bool showK = (k != 0);
+                const bool showH = showK || (h != 0);
+                
+                drawMaybe(seg::G0, seg::SPD_HUNDREDS, h, showH);
+                seg::drawDigit(seg::G0, p, seg::SPD_TENS,  t);
+                seg::drawDigit(seg::G0, p, seg::SPD_UNITS, u);
+
+                // Labels and indicators
+                seg::setFlag(p, seg::OFF_36, seg::LBL_IAS,    (true && s.lblIAS));
+                seg::setFlag(p, seg::OFF_32, seg::LBL_MACH_L, false);
+                seg::setFlag(p, seg::OFF_2E, seg::LBL_MACH_R, false);
+
+                // Bars unchanged
+                seg::setFlag(p, seg::OFF_22, seg::SPD_BAR_TOP,    s.spdBarTop);
+                seg::setFlag(p, seg::OFF_1E, seg::SPD_BAR_BOTTOM, s.spdBarBot);
+
+                // No decimal dot in IAS mode
+                seg::setFlag(p, seg::OFF_19, seg::DOT_SPD, false);
             }
 
-            // Take two decimals only, rounded with the 3rd decimal.
-            // ex: 0.786 -> 78 + (6>=5 ? +1 : +0) -> 79
-            const int twoDigits = std::clamp(round_half_up_to_int(mach * 1000.0f / 10.0f), 0, 99);
-            const int tens  = (twoDigits / 10) % 10;
-            const int units =  twoDigits % 10;
-
-            // Draw only T and U; K and H stay blank.
-            seg::drawDigit(seg::G0, p, seg::SPD_TENS,  tens);
-            seg::drawDigit(seg::G0, p, seg::SPD_UNITS, units);
-
-            // Labels and indicators
-            seg::setFlag(p, seg::OFF_36, seg::LBL_IAS,    false);
-            seg::setFlag(p, seg::OFF_32, seg::LBL_MACH_L, (true && s.lblIAS));
-            seg::setFlag(p, seg::OFF_2E, seg::LBL_MACH_R, (true && s.lblIAS));
-
-            // Bars unchanged
-            seg::setFlag(p, seg::OFF_22, seg::SPD_BAR_TOP,    s.spdBarTop);
-            seg::setFlag(p, seg::OFF_1E, seg::SPD_BAR_BOTTOM, s.spdBarBot);
-
-            // Decimal dot ON in MACH mode
-            seg::setFlag(p, seg::OFF_19, seg::DOT_SPD, true);
-
-        } else {
-            // IAS mode: integer knots, round half-up.
-            const int ias = std::max(0, round_half_up_to_int(spd));
-            int k,h,t,u;
-            digits4(ias, k,h,t,u);
-
-            const bool showK = (k != 0);
-            const bool showH = showK || (h != 0);
-            
-            drawMaybe(seg::G0, seg::SPD_HUNDREDS, h, showH);
-            seg::drawDigit(seg::G0, p, seg::SPD_TENS,  t);
-            seg::drawDigit(seg::G0, p, seg::SPD_UNITS, u);
-
-            // Labels and indicators
-            seg::setFlag(p, seg::OFF_36, seg::LBL_IAS,    (true && s.lblIAS));
-            seg::setFlag(p, seg::OFF_32, seg::LBL_MACH_L, false);
-            seg::setFlag(p, seg::OFF_2E, seg::LBL_MACH_R, false);
-
-            // Bars unchanged
-            seg::setFlag(p, seg::OFF_22, seg::SPD_BAR_TOP,    s.spdBarTop);
-            seg::setFlag(p, seg::OFF_1E, seg::SPD_BAR_BOTTOM, s.spdBarBot);
-
-            // No decimal dot in IAS mode
-            seg::setFlag(p, seg::OFF_19, seg::DOT_SPD, false);
-        }
-
-        if (!isMach) {
-            // Special MCP "A" and "8" digits in IAS mode only
-            if (s.digitA) {
-                seg::drawLetterA(seg::G0, p, seg::SPD_KILO);
-            }
-            if (s.digitB) {
-                seg::drawDigit(seg::G0, p, seg::SPD_KILO, 8);
+            if (!isMach) {
+                // Special MCP "A" and "8" digits in IAS mode only
+                if (s.digitA) {
+                    seg::drawLetterA(seg::G0, p, seg::SPD_KILO);
+                }
+                if (s.digitB) {
+                    seg::drawDigit(seg::G0, p, seg::SPD_KILO, 8);
+                }
             }
         }
+        // When showSpd is false, the segment payload stays cleared by seg::clear(p).
     }
 
     // CAPT CRS: 3 digits -> G0 with flags [H,T,U] = [0x80,0x40,0x20]
     {
-        int h,t,u;
-        digits3(std::max(0, s.crsCapt), h,t,u);
-        seg::drawDigit(seg::G0, p, seg::CPT_CRS_HUNDREDS, h);
-        seg::drawDigit(seg::G0, p, seg::CPT_CRS_TENS,     t);
-        seg::drawDigit(seg::G0, p, seg::CPT_CRS_UNITS,    u);
+        if (s.showCrsCapt) {
+            int h,t,u;
+            digits3(std::max(0, s.crsCapt), h,t,u);
+            seg::drawDigit(seg::G0, p, seg::CPT_CRS_HUNDREDS, h);
+            seg::drawDigit(seg::G0, p, seg::CPT_CRS_TENS,     t);
+            seg::drawDigit(seg::G0, p, seg::CPT_CRS_UNITS,    u);
 
-        // Final dot for CAPT_CRS
-        seg::setFlag(p, seg::OFF_19, seg::DOT_CPT_CRS, s.dotCrsCapt);
+            // Final dot for CAPT_CRS
+            seg::setFlag(p, seg::OFF_19, seg::DOT_CPT_CRS, s.dotCrsCapt);
+        }
     }
 
     // HDG: 3 digits -> G1 with flags [H,T,U] = [0x40,0x20,0x10]
@@ -195,7 +200,7 @@ Payload build(const Snapshot& s) {
             if (absV >= 1000) seg::drawDigit(seg::G2, p, seg::VSPD_KILO,     k);
             if (absV >= 100)  seg::drawDigit(seg::G2, p, seg::VSPD_HUNDREDS, h);
             if (absV >= 10)   seg::drawDigit(seg::G2, p, seg::VSPD_TENS,     t);
-            if (absV >= 1)    seg::drawDigit(seg::G2, p, seg::VSPD_UNITS,    u);
+            seg::drawDigit(seg::G2, p, seg::VSPD_UNITS, u); // Always show units digit, even for 0
 
             // VVI sign and dot
             const bool neg = (v < 0);
@@ -206,7 +211,7 @@ Payload build(const Snapshot& s) {
             seg::setFlag(p, seg::OFF_1B, seg::DOT_VSPD,     s.dotVvi);
 
             // V/S vs FPA label
-            if (absV >= 1) seg::setFlag(p, seg::OFF_38, seg::LBL_VS, s.lblVS);
+            seg::setFlag(p, seg::OFF_38, seg::LBL_VS, s.lblVS); // Show label even for 0
             seg::setFlag(p, seg::OFF_34, seg::LBL_FPA, s.lblFPA);
         }
         // When showVvi is false, the segment payload stays cleared by seg::clear(p).
@@ -214,14 +219,16 @@ Payload build(const Snapshot& s) {
 
     // FO CRS: 3 digits -> G3 with flags [H,T,U] = [0x40,0x20,0x10]
     {
-        int h,t,u;
-        digits3(std::max(0, s.crsFo), h,t,u);
-        seg::drawDigit(seg::G3, p, seg::FO_CRS_HUNDREDS, h);
-        seg::drawDigit(seg::G3, p, seg::FO_CRS_TENS,     t);
-        seg::drawDigit(seg::G3, p, seg::FO_CRS_UNITS,    u);
+        if (s.showCrsFo) {
+            int h,t,u;
+            digits3(std::max(0, s.crsFo), h,t,u);
+            seg::drawDigit(seg::G3, p, seg::FO_CRS_HUNDREDS, h);
+            seg::drawDigit(seg::G3, p, seg::FO_CRS_TENS,     t);
+            seg::drawDigit(seg::G3, p, seg::FO_CRS_UNITS,    u);
 
-        // Final dot for FO_CRS
-        seg::setFlag(p, seg::OFF_1C, seg::DOT_FO_CRS, s.dotCrsFo);
+            // Final dot for FO_CRS
+            seg::setFlag(p, seg::OFF_1C, seg::DOT_FO_CRS, s.dotCrsFo);
+        }
     }
 
     return p;
