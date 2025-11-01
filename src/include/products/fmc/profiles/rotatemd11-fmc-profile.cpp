@@ -1,12 +1,9 @@
 #include "rotatemd11-fmc-profile.h"
 
-#include "appstate.h"
 #include "config.h"
 #include "dataref.h"
 #include "font.h"
 #include "product-fmc.h"
-
-#include <algorithm>
 #include <cstring>
 
 RotateMD11FMCProfile::RotateMD11FMCProfile(ProductFMC *product) :
@@ -16,25 +13,51 @@ RotateMD11FMCProfile::RotateMD11FMCProfile(ProductFMC *product) :
     product->setFont(Font::GlyphData(FontVariant::FontMD11, product->identifierByte));
 
     Dataref::getInstance()->monitorExistingDataref<float>("Rotate/aircraft/controls/mcdu_1_brt", [product](float brightness) {
-        uint8_t target = Dataref::getInstance()->get<bool>("Rotate/aircraft/systems/elec_dc_batt_bus_pwrd") ? brightness * 255.0f : 0;
+        // Power is on if either AC bus 1 or emergency AC bus is powered
+        bool hasPower = Dataref::getInstance()->get<bool>("Rotate/aircraft/systems/elec_ac_bus_1_pwrd") ||
+                        Dataref::getInstance()->get<bool>("Rotate/aircraft/systems/elec_emer_ac_bus_l_pwrd");
+        uint8_t target = hasPower ? brightness * 255.0f : 0;
         product->setLedBrightness(FMCLed::SCREEN_BACKLIGHT, target);
     });
 
     Dataref::getInstance()->monitorExistingDataref<float>("Rotate/aircraft/controls/instr_panel_lts", [product](float brightness) {
-        uint8_t target = Dataref::getInstance()->get<bool>("Rotate/aircraft/systems/elec_dc_batt_bus_pwrd") ? brightness * 255.0f : 0;
+        // Power is on if either AC bus 1 or emergency AC bus is powered
+        bool hasPower = Dataref::getInstance()->get<bool>("Rotate/aircraft/systems/elec_ac_bus_1_pwrd") ||
+                        Dataref::getInstance()->get<bool>("Rotate/aircraft/systems/elec_emer_ac_bus_l_pwrd");
+        uint8_t target = hasPower ? brightness * 255.0f : 0;
         product->setLedBrightness(FMCLed::BACKLIGHT, target);
     });
 
-    Dataref::getInstance()->monitorExistingDataref<bool>("Rotate/aircraft/systems/elec_dc_batt_bus_pwrd", [](bool poweredOn) {
+    // Monitor both power buses - trigger brightness updates when either changes
+    Dataref::getInstance()->monitorExistingDataref<bool>("Rotate/aircraft/systems/elec_ac_bus_1_pwrd", [](bool poweredOn) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/mcdu_1_brt");
         Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/instr_panel_lts");
     });
+
+    Dataref::getInstance()->monitorExistingDataref<bool>("Rotate/aircraft/systems/elec_emer_ac_bus_l_pwrd", [](bool poweredOn) {
+        Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/mcdu_1_brt");
+        Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/instr_panel_lts");
+    });
+
+    // MSG light - monitor int array dataref and use first value
+    Dataref::getInstance()->monitorExistingDataref<std::vector<int>>("Rotate/aircraft/systems/mcdu_msg_lt", [product](std::vector<int> msgLights) {
+        bool msgEnabled = !msgLights.empty() && msgLights[0] > 0;
+        product->setLedBrightness(FMCLed::PFP_MSG, msgEnabled ? 1 : 0);
+        product->setLedBrightness(FMCLed::MCDU_MCDU, msgEnabled ? 1 : 0);
+    });
+
+    // Trigger backlight and MSG light initialization at startup
+    Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/mcdu_1_brt");
+    Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/instr_panel_lts");
+    Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/systems/mcdu_msg_lt");
 }
 
 RotateMD11FMCProfile::~RotateMD11FMCProfile() {
     Dataref::getInstance()->unbind("Rotate/aircraft/controls/mcdu_1_brt");
     Dataref::getInstance()->unbind("Rotate/aircraft/controls/instr_panel_lts");
-    Dataref::getInstance()->unbind("Rotate/aircraft/systems/elec_dc_batt_bus_pwrd");
+    Dataref::getInstance()->unbind("Rotate/aircraft/systems/elec_ac_bus_1_pwrd");
+    Dataref::getInstance()->unbind("Rotate/aircraft/systems/elec_emer_ac_bus_l_pwrd");
+    Dataref::getInstance()->unbind("Rotate/aircraft/systems/mcdu_msg_lt");
 }
 
 bool RotateMD11FMCProfile::IsEligible() {
@@ -107,8 +130,8 @@ const std::vector<FMCButtonDef> &RotateMD11FMCProfile::buttonDefs() const {
         {FMCKey::MCDU_EMPTY_TOP_RIGHT, "Rotate/aircraft/controls_c/cdu_0/mcdu_key_ENGOUT"},
         
         // Navigation Keys
-        {std::vector<FMCKey>{FMCKey::MCDU_PAGE_UP, FMCKey::PAGE_PREV}, "Rotate/aircraft/controls_c/cdu_0/mcdu_key_UP"},
-        {std::vector<FMCKey>{FMCKey::MCDU_PAGE_DOWN, FMCKey::PAGE_NEXT}, "Rotate/aircraft/controls_c/cdu_0/mcdu_key_DOWN"},
+        {std::vector<FMCKey>{FMCKey::MCDU_PAGE_UP, FMCKey::PAGE_PREV}, "Rotate/aircraft/controls_c/cdu_0/mcdu_key_DOWN"},
+        {std::vector<FMCKey>{FMCKey::MCDU_PAGE_DOWN, FMCKey::PAGE_NEXT}, "Rotate/aircraft/controls_c/cdu_0/mcdu_key_UP"},
         {FMCKey::PFP_EXEC, "Rotate/aircraft/controls_c/cdu_0/mcdu_key_PAGE"},
 
                 // Brightness Controls

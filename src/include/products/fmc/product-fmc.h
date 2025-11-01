@@ -7,9 +7,24 @@
 #include <chrono>
 #include <map>
 #include <set>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
+#include <deque>
 
 class ProductFMC : public USBDevice {
     private:
+        // Worker queue command structure (needs to be declared first)
+        struct IoCmd {
+            enum Type : uint8_t {
+                DrawPage,
+                WriteData
+            } type;
+            std::vector<uint8_t> data;
+            std::vector<std::vector<char>> pageData;
+        };
+
         FMCAircraftProfile *profile;
         std::vector<std::vector<char>> page;
         int lastUpdateCycle;
@@ -18,11 +33,38 @@ class ProductFMC : public USBDevice {
         uint64_t lastButtonStateLo;
         uint32_t lastButtonStateHi;
 
+        // I/O worker thread
+        std::thread              _ioThread;
+        std::atomic<bool>        _ioRunning{false};
+        std::mutex               _ioMx;
+        std::condition_variable  _ioCv;
+        std::deque<IoCmd>        _ioQueue;
+
+        // Coalescing state for last sent page
+        std::vector<std::vector<char>> _sentPage;
+        
+        // Drawing rate-limit (similar to PAP3 LCD rate-limit)
+        float                    _minDrawPeriod = 1.f / 25.f; // ~25 Hz
+
         void updatePage();
         void draw(const std::vector<std::vector<char>> *pagePtr = nullptr);
         std::pair<uint8_t, uint8_t> dataFromColFont(char color, bool fontSmall = false);
 
         void setProfileForCurrentAircraft();
+
+        // Worker thread main loop
+        void ioThreadMain();
+
+        inline void qEnqueue(IoCmd&& c) {
+            { std::lock_guard<std::mutex> lk(_ioMx); _ioQueue.emplace_back(std::move(c)); }
+            _ioCv.notify_one();
+        }
+        inline void qDrawPage(const std::vector<std::vector<char>>& page) {
+            IoCmd c; c.type = IoCmd::DrawPage; c.pageData = page; qEnqueue(std::move(c));
+        }
+        inline void qWriteData(const std::vector<uint8_t>& data) {
+            IoCmd c; c.type = IoCmd::WriteData; c.data = data; qEnqueue(std::move(c));
+        }
 
     public:
         ProductFMC(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName, FMCHardwareType hardwareType, FMCDeviceVariant variant, unsigned char identifierByte);

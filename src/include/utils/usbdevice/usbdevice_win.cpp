@@ -38,7 +38,6 @@ bool USBDevice::connect() {
             } else if (!result) {
                 DWORD error = GetLastError();
                 if (error != ERROR_DEVICE_NOT_CONNECTED) {
-                    debug_force("ReadFile failed with error: %lu\n", error);
                 }
                 break;
             }
@@ -70,7 +69,6 @@ void USBDevice::InputReportCallback(void *context, DWORD bytesRead, uint8_t *rep
     } catch (const std::system_error &e) {
         return;
     } catch (...) {
-        debug_force("Unexpected exception in InputReportCallback\n");
         return;
     }
 }
@@ -105,12 +103,10 @@ void USBDevice::forceStateSync() {
 
 bool USBDevice::writeData(std::vector<uint8_t> data) {
     if (hidDevice == INVALID_HANDLE_VALUE || !connected || data.empty()) {
-        debug_force("HID device not open, not connected, or empty data\n");
         return false;
     }
 
     if (data.size() > 1024) {
-        debug_force("Data size too large: %zu bytes\n", data.size());
         return false;
     }
 
@@ -118,7 +114,6 @@ bool USBDevice::writeData(std::vector<uint8_t> data) {
     BOOL result = WriteFile(hidDevice, data.data(), (DWORD) data.size(), &bytesWritten, nullptr);
     if (!result || bytesWritten < data.size()) {
         DWORD error = GetLastError();
-        debug_force("WriteFile failed: %lu (expected %zu bytes, wrote %lu)\n", error, data.size(), bytesWritten);
         return false;
     }
     return true;

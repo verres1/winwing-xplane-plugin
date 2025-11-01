@@ -138,7 +138,9 @@ private:
     std::deque<IoCmd>        _ioQueue;
 
     // Coalescing state actually sent to device
-    uint32_t                 _sentLedBitmap = 0;
+    // Initialize _sentLedBitmap to all-1s so that initial LED commands are actually sent
+    // (otherwise allLedsOff() during startup won't send anything because diff is 0)
+    uint32_t                 _sentLedBitmap = 0xFFFFFFFF;
     uint8_t                  _sentDimming[3] = {255,255,255};
     bool                     _sentSolenoid = false;
     std::vector<uint8_t>     _sentLcd32;

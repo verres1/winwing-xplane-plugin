@@ -22,12 +22,16 @@ using Payload = pap3::lcd::segments::Payload;
 struct Snapshot {
     // Numeric fields (expected ranges; values are clamped internally)
     float spd = 0;        // 0..9999 (drawn as 4 digits: K,H,T,U)
+    bool showSpd = false;
     int hdg = 0;        // 0..359  (drawn as 3 digits: H,T,U)
+    bool showHdg = true;  // Whether to show heading display
     int alt = 0;        // 0..99999 (drawn as 5 digits: 10k,k,h,t,u)
     int vvi = 0;        // -9999..9999 (sign & 4 digits abs)
     bool showVvi = false;
     int crsCapt = 0;    // 0..359  (3 digits)
+    bool showCrsCapt = true;  // Whether to show captain course
     int crsFo   = 0;    // 0..359  (3 digits)
+    bool showCrsFo = true;    // Whether to show FO course
     bool digitA  = false; // Special MCP "A" digit
     bool digitB  = false; // Special MCP "8" digit
 

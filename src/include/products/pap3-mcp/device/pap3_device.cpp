@@ -84,10 +84,8 @@ PAP3Device::PAP3Device(HIDDeviceHandle hidDevice,
 , _seq(5)
 {
     ensureWriterInstalled();
-    debug_force("PAP3Device constructed - vendorId: 0x%04X, productId: 0x%04X\n", vendorId, productId);
 
     if (USBDevice::connect()) {
-        debug_force("PAP3Device connected\n");
         runStartupSequence();
     }
 }
@@ -189,7 +187,6 @@ void PAP3Device::runStartupSequence()
     // 6) Attendre une 1re photo des switches (snapshot HID brut)
     const bool gotSnapshot = waitForInitialSwitchSnapshot(std::chrono::milliseconds(1000));
     if (!gotSnapshot) {
-        debug_force("[PAP3] WARNING: no initial switch snapshot within timeout -> continuing\n");
     }
 
     // 7) Détecter + démarrer le profil
@@ -210,12 +207,10 @@ void PAP3Device::runStartupSequence()
         if (_haveInitialReport && !_initialReport.empty()) {
             const auto* data = _initialReport.data();
             const auto len = static_cast<int>(_initialReport.size());
-            debug_force("[PAP3] Applying initial hardware snapshot (%d bytes)\n", len);
             _profile->syncSimToHardwareFromRaw(data, len);
             _pendingInitialHardwareSync = false;
             _didStartupSync = true;
         } else {
-            debug_force("[PAP3] No raw snapshot yet -> will apply once received\n");
             _pendingInitialHardwareSync = true;
         }
 
@@ -229,7 +224,6 @@ void PAP3Device::runStartupSequence()
         profileReady = true;
     }
     
-    debug_force("[PAP3] Startup sequence complete - profile %s\n", _profile ? "ready" : "not found");
 
     updatePower(); // met à jour dimming + solénoïde (selon power mask)
 }
@@ -270,9 +264,7 @@ void PAP3Device::onHidInputReport(const std::uint8_t* report, int len)
             _haveInitialReport = true;
         }
         _snapshotCv.notify_all();
-        debug_force("[PAP3] Captured initial switch snapshot (%d bytes)\n", len);
         if (_pendingInitialHardwareSync && _profile) {
-            debug_force("[PAP3] Applying captured hardware snapshot to sim (deferred)\n");
             _profile->syncSimToHardwareFromRaw(_initialReport.data(),
                                                static_cast<int>(_initialReport.size()));
             _pendingInitialHardwareSync = false;
@@ -303,9 +295,7 @@ void PAP3Device::setupInputCallbacks()
             if (it.d == 0) continue;
 
             if (const char* name = LookupEncoderName(it.off)) {
-                debug_force("[PAP3][ENC] %s: delta=%+d\n", name, static_cast<int>(it.d));
             } else {
-                debug_force("[PAP3][ENC] off=0x%02X: delta=%+d\n", it.off, static_cast<int>(it.d));
             }
 
             if (_profile) _profile->onEncoderDelta(it.off, it.d);
@@ -443,12 +433,16 @@ void PAP3Device::applyState(const aircraft::State& st)
     // --- LCD: State → Snapshot → 32B payload --------------------------------
     lcdc::Snapshot s{};
     s.spd     = st.spd;
+    s.showSpd = st.spdVisible;
     s.hdg     = st.hdg;
+    s.showHdg = st.hdgVisible;
     s.alt     = st.alt;
     s.vvi     = st.vvi;
     s.showVvi = st.vviVisible;
     s.crsCapt = st.crsCapt;
+    s.showCrsCapt = st.crsVisible;
     s.crsFo   = st.crsFo;
+    s.showCrsFo = st.crsVisible;
     s.digitA  = st.digitA;
     s.digitB  = st.digitB;
 
@@ -613,6 +607,10 @@ void PAP3Device::ioThreadMain() {
 
             _sentLcd32 = pendLcd32;
             lastLcdTx = now;
+        } else if (!changed && havePend) {
+            // debug_force("[PAP3][LCD] I/O Thread: LCD unchanged, skipping\n");
+        } else if (!timeOk) {
+            // debug_force("[PAP3][LCD] I/O Thread: Rate limited, skipping\n");
         }
     }
 }

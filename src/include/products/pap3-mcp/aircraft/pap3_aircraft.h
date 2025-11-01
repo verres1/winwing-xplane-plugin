@@ -31,11 +31,14 @@ namespace PowerBits {
 struct State {
     // --- MCP values ----------------------------------------------------------
     float spd           = 0.0f;  ///< IAS/Mach window value (device expects float)
+    bool  spdVisible    = true;  ///< Whether IAS/Mach window is currently visible/active
     int   hdg           = 0;     ///< Heading (degrees, 0..359 or sim-native domain)
+    bool  hdgVisible    = true;  ///< Whether heading window is currently visible/active
     int   alt           = 0;     ///< Selected altitude (feet)
     float vvi           = 0.0f;     ///< Vertical speed (fpm)
     bool  vviVisible    = true;///< Whether V/S window is currently visible/active
     int   crsCapt       = 0;     ///< Captain course (degrees)
+    bool  crsVisible    = true;  ///< Whether course displays are visible (some aircraft don't have course on MCP)
     int   crsFo         = 0;     ///< First Officer course (degrees)
     bool  digitA        = false;
     bool  digitB        = false;

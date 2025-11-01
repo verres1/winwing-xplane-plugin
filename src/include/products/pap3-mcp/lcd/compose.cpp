@@ -145,22 +145,25 @@ Payload build(const Snapshot& s) {
 
     // HDG: 3 digits -> G1 with flags [H,T,U] = [0x40,0x20,0x10]
     {
-        int h,t,u;
-        // Clamp 0..359 but still draw as 3 digits (000..359)
-        int hdg = std::clamp(s.hdg, 0, 359);
-        digits3(hdg, h,t,u);
-        seg::drawDigit(seg::G1, p, seg::HDG_HUNDREDS, h);
-        seg::drawDigit(seg::G1, p, seg::HDG_TENS,     t);
-        seg::drawDigit(seg::G1, p, seg::HDG_UNITS,    u);
+        if (s.showHdg) {
+            int h,t,u;
+            // Clamp 0..359 but still draw as 3 digits (000..359)
+            int hdg = std::clamp(s.hdg, 0, 359);
+            digits3(hdg, h,t,u);
+            seg::drawDigit(seg::G1, p, seg::HDG_HUNDREDS, h);
+            seg::drawDigit(seg::G1, p, seg::HDG_TENS,     t);
+            seg::drawDigit(seg::G1, p, seg::HDG_UNITS,    u);
 
-        // Final dot for HDG
-        seg::setFlag(p, seg::OFF_26, seg::DOT_HDG, s.dotHdg);
+            // Final dot for HDG
+            seg::setFlag(p, seg::OFF_26, seg::DOT_HDG, s.dotHdg);
 
-        // HDG/TRK labels (two halves each)
-        seg::setFlag(p, seg::OFF_36, seg::LBL_HDG_L, s.lblHDG);
-        seg::setFlag(p, seg::OFF_32, seg::LBL_HDG_R, s.lblHDG);
-        seg::setFlag(p, seg::OFF_2E, seg::LBL_TRK_L, s.lblTRK);
-        seg::setFlag(p, seg::OFF_2A, seg::LBL_TRK_R, s.lblTRK);
+            // HDG/TRK labels (two halves each)
+            seg::setFlag(p, seg::OFF_36, seg::LBL_HDG_L, s.lblHDG);
+            seg::setFlag(p, seg::OFF_32, seg::LBL_HDG_R, s.lblHDG);
+            seg::setFlag(p, seg::OFF_2E, seg::LBL_TRK_L, s.lblTRK);
+            seg::setFlag(p, seg::OFF_2A, seg::LBL_TRK_R, s.lblTRK);
+        }
+        // When showHdg is false, the segment payload stays cleared by seg::clear(p).
     }
 
     // ALT: 5 digits

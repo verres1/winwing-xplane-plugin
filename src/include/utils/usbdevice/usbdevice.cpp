@@ -78,10 +78,8 @@ USBDevice *USBDevice::Device(HIDDeviceHandle hidDevice, uint16_t vendorId, uint1
             return new ProductFCUEfis(hidDevice, vendorId, productId, vendorName, productName);
 
         case 0xBF0F: // PAP3-MCP
-            debug_force("Detected PAP3 MCP device - vendorId: 0x%04X, productId: 0x%04X\n", vendorId, productId);
             return new pap3::device::PAP3Device(hidDevice, vendorId, productId, vendorName, productName);
         default:
-            debug_force("Unknown Winwing device - vendorId: 0x%04X, productId: 0x%04X\n", vendorId, productId);
             return nullptr;
     }
 }

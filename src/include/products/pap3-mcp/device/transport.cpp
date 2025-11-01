@@ -119,7 +119,6 @@ bool sendDimming(DevicePtr dev, uint8_t channel, uint8_t value)
 {
     if (!haveWriter()) return false;
     auto buf = makeShortCommand(channel, value);
-    debug_force("[PAP3] sendDimming(ch=%u, val=%u) sent\n", static_cast<unsigned>(channel), static_cast<unsigned>(value));
     return write(dev, buf.data(), buf.size());
     
 }
@@ -131,7 +130,6 @@ bool sendLed(DevicePtr dev, uint8_t ledId, bool on)
 {
     if (!haveWriter()) return false;
     auto buf = makeShortCommand(ledId, static_cast<uint8_t>(on ? 0x01 : 0x00));
-    debug_force("[PAP3] sendLed(id=0x%02X, %s) sent\n", static_cast<unsigned>(ledId), on ? "ON" : "OFF");
     return write(dev, buf.data(), buf.size());
     
 }
@@ -144,7 +142,6 @@ bool sendATSolenoid(DevicePtr dev, bool on)
     if (!haveWriter()) return false;
     constexpr uint8_t selectorAT = 0x1E;
     auto buf = makeShortCommand(selectorAT, static_cast<uint8_t>(on ? 0x01 : 0x00));
-    debug_force("[PAP3] sendATSolenoid(%s) sent\n", on ? "ON" : "OFF");
     return write(dev, buf.data(), buf.size());
     
 }
@@ -247,10 +244,9 @@ bool sendLcdPayload(DevicePtr dev, uint8_t& seq, const std::vector<uint8_t>& pay
     initCommon(buf, seq, OP_LCD_PAYLOAD);
     writePayloadPreamble(buf);
     writePayloadBytes(buf, payload);
-
+    
     const bool ok = write(dev, buf, sizeof(buf));
     if (ok) bumpSeq(seq);
-    debug_force("[PAP3][LCD] sendLcdPayload(seq=%u) sent\n", static_cast<unsigned>(seq));
     return ok;
 }
 
@@ -264,7 +260,6 @@ bool sendLcdEmptyFrame(DevicePtr dev, uint8_t& seq)
 
     const bool ok = write(dev, buf, sizeof(buf));
     if (ok) bumpSeq(seq);
-    debug_force("[PAP3][LCD] sendLcdEmptyFrame(seq=%u) sent\n", static_cast<unsigned>(seq));
     return ok;
 }
 
@@ -279,7 +274,6 @@ bool sendLcdCommit(DevicePtr dev, uint8_t& seq)
     writeCommitConstants(buf);
 
     const bool ok = write(dev, buf, sizeof(buf));
-    debug_force("[PAP3][LCD] sendLcdCommit(seq=%u) sent\n", static_cast<unsigned>(seq));
     if (ok) bumpSeq(seq);
     return ok;
 }
@@ -295,7 +289,6 @@ bool sendLcdInit(DevicePtr dev, uint8_t& seq)
     writeInitTail(buf);
 
     const bool ok = write(dev, buf, sizeof(buf));
-    debug_force("[PAP3][LCD] sendLcdInit(seq=%u) sent\n", static_cast<unsigned>(seq));
     if (ok) bumpSeq(seq);
     return ok;
 }

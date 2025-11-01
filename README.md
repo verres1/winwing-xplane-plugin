@@ -1,3 +1,8 @@
+Fork of rswilem winwing-xplane-plugin and Belnadifia repository
+On top of official winwing-xplane-plugin I have added support for PAP3 in FF777V2 and RotateMD11
+I have added threading for PFP thanks to Belnadifia repository
+This repo is using custom build system
+
 ## Winwing plugin for X-Plane 12
 
 For X-Plane 12 only.
@@ -19,11 +24,14 @@ For linux, see the [Linux udev rules](#linux-udev-rules) section below to ensure
 
 - Fork the repository.
 - Download the latest X-Plane 12 SDK from https://developer.x-plane.com/sdk/plugin-sdk-downloads/.
-- Unzip and copy the `SDK/` folder to the root of the repository.
+- Set the `XPLANE_SDK_DIR` environment variable to point to your SDK directory (see [BUILD.md](BUILD.md) for details).
+- Build the plugin using `./build.sh` for native builds or `./docker-build-all.sh` for multi-platform builds.
 - Make your changes.
 - Test your changes in X-Plane 12. Datareftool plugin recommented, and make sure you uninstall FlyWithLua as it can interfere with the "Reload Plugins" functionality.
 - Commit your changes and push to your fork.
 - Create a pull request with a description of your changes.
+
+For detailed build instructions, see [BUILD.md](BUILD.md).
 
 ### Usage
 
@@ -34,15 +42,15 @@ For linux, see the [Linux udev rules](#linux-udev-rules) section below to ensure
 
 The matrix below shows device and aircraft compatibility. Devices are listed vertically, aircraft horizontally.
 
-| Device                      | Toliss A3xx | Laminar A330 | AeroGenesis A330 | Zibo 737 | IXEG 737 | FF 767/777 | SSG 747 |
-| --------------------------- | ----------- | ------------ | ---------------- | -------- | -------- | ---------- | ------- |
-| **URSA MINOR Joystick L+R** | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟢      |
-| **MCDU-32**                 | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      |
-| **PFP 3N**                  | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      |
-| **PFP 4**                   | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      |
-| **PFP 7**                   | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      |
-| **Panel of Autopilot 3**    | 🔴          | 🔴           | 🔴               | 🟢       | 🔴       | 🔴         | 🔴      |
-| **FCU and EFIS L+R**        | 🟢          | 🟢           | 🔴               | 🔴       | 🔴       | 🔴         | 🔴      |
+| Device                      | Toliss A3xx | Laminar A330 | AeroGenesis A330 | Zibo 737 | IXEG 737 | FF 767/777 | SSG 747 | Rotate MD11  |
+| --------------------------- | ----------- | ------------ | ---------------- | -------- | -------- | ---------- | ------- | ------------ |
+| **URSA MINOR Joystick L+R** | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟢      | 🟢           |
+| **MCDU-32**                 | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      | 🟢           |
+| **PFP 3N**                  | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      | 🟢           |
+| **PFP 4**                   | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      | 🟢           |
+| **PFP 7**                   | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      | 🟢           |
+| **Panel of Autopilot 3**    | 🔴          | 🔴           | 🔴               | 🟢       | 🔴       | 🟢         | 🔴      | 🟢           |
+| **FCU and EFIS L+R**        | 🟢          | 🟢           | 🔴               | 🔴       | 🔴       | 🔴         | 🔴      | 🔴           |
 
 #### Legend
 

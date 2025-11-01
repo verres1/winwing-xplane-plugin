@@ -51,14 +51,12 @@ PLUGIN_API int XPluginStart(char *name, char *sig, char *desc) {
     debugLoggingMenuItemIndex = XPLMAppendMenuItem(mainMenuId, "Enable debug logging", (void *) "ActionToggleDebugLogging", 0);
     XPLMCheckMenuItem(mainMenuId, debugLoggingMenuItemIndex, xplm_Menu_Unchecked);
 
-    debug_force("Plugin started (version %s)\n", VERSION);
 
     return 1;
 }
 
 PLUGIN_API void XPluginStop(void) {
     AppState::getInstance()->deinitialize();
-    debug_force("Plugin stopped\n");
 }
 
 PLUGIN_API int XPluginEnable(void) {
@@ -68,7 +66,6 @@ PLUGIN_API int XPluginEnable(void) {
 }
 
 PLUGIN_API void XPluginDisable(void) {
-    debug_force("Disabling plugin...\n");
 }
 
 PLUGIN_API void XPluginReceiveMessage(XPLMPluginID from, long msg, void *params) {
@@ -109,7 +106,6 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID from, long msg, void *params)
 
 void menuAction(void *mRef, void *iRef) {
     if (!strcmp((char *) iRef, "ActionReloadDevices")) {
-        debug_force("Reloading devices...\n");
         USBController::getInstance()->disconnectAllDevices();
         USBController::getInstance()->connectAllDevices();
     } else if (!strcmp((char *) iRef, "ActionToggleDebugLogging")) {
@@ -122,13 +118,10 @@ void menuAction(void *mRef, void *iRef) {
         AppState::getInstance()->debuggingEnabled = debugLoggingEnabled;
 
         if (debugLoggingEnabled) {
-            debug_force("Debug logging was enabled. Currently connected devices (%lu):\n", USBController::getInstance()->devices.size());
 
             for (auto &device : USBController::getInstance()->devices) {
-                debug_force("- (vendorId: 0x%04X, productId: 0x%04X, handler: %s) %s\n", device->vendorId, device->productId, device->classIdentifier(), device->productName.c_str());
             }
         } else {
-            debug_force("Debug logging was disabled.\n");
         }
     }
 }

@@ -25,6 +25,7 @@ ZiboPAP3Profile::ZiboPAP3Profile() {
     _drZiboCheck = XPLMFindDataRef("laminar/B738/zibomod/filename_list");
 
     // MCP values
+    _drSpdShow     = XPLMFindDataRef("laminar/B738/autopilot/show_ias");
     _drSpd     = XPLMFindDataRef("laminar/B738/autopilot/mcp_speed_dial_kts_mach");
     _drHdg     = XPLMFindDataRef("laminar/B738/autopilot/mcp_hdg_dial");
     _drAlt     = XPLMFindDataRef("laminar/B738/autopilot/mcp_alt_dial");
@@ -32,7 +33,7 @@ ZiboPAP3Profile::ZiboPAP3Profile() {
     _drVviShow = XPLMFindDataRef("laminar/B738/autopilot/vvi_dial_show");
     _drCrsCapt = XPLMFindDataRef("laminar/B738/autopilot/course_pilot");
     _drCrsFo   = XPLMFindDataRef("laminar/B738/autopilot/course_copilot");
-
+    
     // Brightness
     _drMcpBrightnessArr = XPLMFindDataRef("sim/cockpit2/electrical/instrument_brightness_ratio_manual");
     _drCockpitLightsArr = XPLMFindDataRef("laminar/B738/electric/panel_brightness");
@@ -165,6 +166,7 @@ void ZiboPAP3Profile::tick() {
 // -----------------------------------------------------------------------------
 void ZiboPAP3Profile::poll() {
     if (_drSpd)     _state.spd     = XPLMGetDataf(_drSpd);
+    if (_drSpdShow) _state.spdVisible = XPLMGetDataf(_drSpdShow) > 0.5f;
     if (_drHdg)     _state.hdg     = XPLMGetDatai(_drHdg);
     if (_drAlt)     _state.alt     = XPLMGetDatai(_drAlt);
     if (_drVvi)     _state.vvi     = XPLMGetDataf(_drVvi);
@@ -252,8 +254,6 @@ void ZiboPAP3Profile::toggleToPosIfNeeded(XPLMDataRef posRef,
 
     guardTs = now;
     lastCommandedPos = desiredPos;
-    debug_force("[PAP3][TOGGLE] posRef=%p simPos=%d desired=%d -> toggle cmd\n",
-                static_cast<void*>(posRef), simPos, desiredPos);
     XPLMCommandOnce(toggleCmd);
 }
 
@@ -279,7 +279,6 @@ void ZiboPAP3Profile::onButton(std::uint8_t off, std::uint8_t mask, bool pressed
     if (off == 0x04 && mask == 0x08) {
         
         if (!pressed) return;
-        debug_force("F/D CAPT ON\n");
         _intent.fd_capt_on = true;
         _haveIntent = true;
     toggleToPosIfNeeded(_drFDCaptPos, FD_ON_POS, _cmdFDCaptToggle, _guardFdCaptTs, _lastFdCaptCmdPos);
@@ -290,7 +289,6 @@ void ZiboPAP3Profile::onButton(std::uint8_t off, std::uint8_t mask, bool pressed
     if (off == 0x04 && mask == 0x10) {
         
         if (!pressed) return;
-        debug_force("F/D CAPT OFF\n");
         _intent.fd_capt_on = false;
         _haveIntent = true;
     toggleToPosIfNeeded(_drFDCaptPos, FD_OFF_POS, _cmdFDCaptToggle, _guardFdCaptTs, _lastFdCaptCmdPos);
@@ -301,7 +299,6 @@ void ZiboPAP3Profile::onButton(std::uint8_t off, std::uint8_t mask, bool pressed
     if (off == 0x04 && mask == 0x20) {
         
         if (!pressed) return;
-        debug_force("F/D FO ON\n");
         _intent.fd_fo_on = true;
         _haveIntent = true;
     toggleToPosIfNeeded(_drFDFoPos, FD_ON_POS, _cmdFDFoToggle, _guardFdFoTs, _lastFdFoCmdPos);
@@ -312,7 +309,6 @@ void ZiboPAP3Profile::onButton(std::uint8_t off, std::uint8_t mask, bool pressed
     if (off == 0x04 && mask == 0x40) {
         
         if (!pressed) return;
-        debug_force("F/D FO OFF\n");
         _intent.fd_fo_on = false;
         _haveIntent = true;
     toggleToPosIfNeeded(_drFDFoPos, FD_OFF_POS, _cmdFDFoToggle, _guardFdFoTs, _lastFdFoCmdPos);
@@ -323,7 +319,6 @@ void ZiboPAP3Profile::onButton(std::uint8_t off, std::uint8_t mask, bool pressed
     if (off == 0x06 && mask == 0x01) {
         
         if (!pressed) return;
-        debug_force("A/T ARM ON\n");
         _intent.at_arm_on = true;
         _haveIntent = true;
         if (_device) {
@@ -343,7 +338,6 @@ void ZiboPAP3Profile::onButton(std::uint8_t off, std::uint8_t mask, bool pressed
     if (off == 0x06 && mask == 0x02) {
         
         if (!pressed) return;
-        debug_force("A/T ARM OFF\n");
         _intent.at_arm_on = false;
         _haveIntent = true;
         if (_device) {
@@ -363,7 +357,6 @@ void ZiboPAP3Profile::onButton(std::uint8_t off, std::uint8_t mask, bool pressed
     if (off == 0x04 && mask == 0x80) {
         
         if (!pressed) return;
-        debug_force("A/P DISENGAGE ON\n");
         _intent.ap_engaged = true;
         _haveIntent = true;
     const int desiredPos = AP_ON_POS;
@@ -380,7 +373,6 @@ void ZiboPAP3Profile::onButton(std::uint8_t off, std::uint8_t mask, bool pressed
     if (off == 0x05 && mask == 0x01) {
         
         if (!pressed) return;
-        debug_force("A/P DISENGAGE OFF\n");
         _intent.ap_engaged = false;
         _haveIntent = true;
     const int desiredPos = AP_OFF_POS;

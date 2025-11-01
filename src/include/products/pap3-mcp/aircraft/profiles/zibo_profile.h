@@ -110,6 +110,7 @@ private:
 
     // --- MCP numeric values ---
     XPLMDataRef _drSpd{nullptr};
+    XPLMDataRef _drSpdShow{nullptr};
     XPLMDataRef _drHdg{nullptr};
     XPLMDataRef _drAlt{nullptr};
     XPLMDataRef _drVvi{nullptr};

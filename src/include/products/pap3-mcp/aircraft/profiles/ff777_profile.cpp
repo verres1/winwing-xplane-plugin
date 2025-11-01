@@ -242,19 +242,19 @@ void FF777PAP3Profile::poll() {
     // FF777 has fewer LEDs than a full 737 MCP, so we map what's available
     _state.led.N1      = false; // Use CLB button status if available
     _state.led.SPEED   = false; // No direct LED for SPEED mode
-    _state.led.VNAV    = (_drLedVnav   && XPLMGetDataf(_drLedVnav)   > 0.5f);
-    _state.led.LVL_CHG = (_drLedFlch   && XPLMGetDataf(_drLedFlch)   > 0.5f); // FLCH = LVL_CHG
+    _state.led.VNAV    = dr_is_on(_drLedVnav);
+    _state.led.LVL_CHG = dr_is_on(_drLedFlch); // FLCH = LVL_CHG
     _state.led.HDG_SEL = false; // No direct HDG SEL LED in FF777
-    _state.led.LNAV    = (_drLedLnav   && XPLMGetDataf(_drLedLnav)   > 0.5f);
-    _state.led.VORLOC  = (_drLedLoc    && XPLMGetDataf(_drLedLoc)    > 0.5f);
-    _state.led.APP     = (_drLedApp    && XPLMGetDataf(_drLedApp)    > 0.5f);
-    _state.led.ALT_HLD = (_drLedAltHold && XPLMGetDataf(_drLedAltHold) > 0.5f);
-    _state.led.V_S     = (_drLedVs     && XPLMGetDataf(_drLedVs)     > 0.5f);
-    _state.led.CMD_A   = (_drLedCaptAP && XPLMGetDataf(_drLedCaptAP) > 0.5f);
+    _state.led.LNAV    = dr_is_on(_drLedLnav);
+    _state.led.VORLOC  = dr_is_on(_drLedLoc);
+    _state.led.APP     = dr_is_on(_drLedApp);
+    _state.led.ALT_HLD = dr_is_on(_drLedAltHold);
+    _state.led.V_S     = dr_is_on(_drLedVs);
+    _state.led.CMD_A   = dr_is_on(_drLedCaptAP);
     _state.led.CWS_A   = false; // FF777 doesn't have CWS LEDs
     _state.led.CMD_B   = false; // FF777 has single AP engage
     _state.led.CWS_B   = false;
-    _state.led.AT_ARM  = (_drLedAt     && XPLMGetDataf(_drLedAt)     > 0.5f);
+    _state.led.AT_ARM  = dr_is_on(_drLedAt);
     _state.led.MA_CAPT = false; // FF777 doesn't have separate Master lights
     _state.led.MA_FO   = false; // FF777 doesn't have separate Master lights
 

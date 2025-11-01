@@ -3,7 +3,6 @@
 #include <XPLMDataAccess.h>
 #include <XPLMUtilities.h>
 #include <vector>
-#include <string>
 #include <cstdint>
 #include <cmath>
 

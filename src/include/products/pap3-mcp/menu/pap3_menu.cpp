@@ -86,7 +86,7 @@ void Initialize(XPLMMenuID mainMenuId) {
     RefreshChecks();
 }
 
-bool GetShowLcdLabels() { return s_showLabels; }
+bool GetShowLcdLabels() { return true; }
 
 void SaveIni()   { SaveIniAll(); }
 void ReloadIni() { LoadIni(); RefreshChecks(); }

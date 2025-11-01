@@ -36,7 +36,6 @@ bool AppState::initialize() {
 
     pluginInitialized = true;
 
-    debug_force("Plugin initialized.\n");
     return true;
 }
 
@@ -45,7 +44,6 @@ void AppState::deinitialize() {
         return;
     }
 
-    debug_force("Plugin deinitializing...\n");
     XPLMUnregisterFlightLoopCallback(AppState::Update, nullptr);
 
     USBController::getInstance()->destroy();

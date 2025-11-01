@@ -39,7 +39,6 @@ bool USBDevice::connect() {
                 InputReportCallback(this, (int) bytesRead, buffer);
             } else if (bytesRead < 0) {
                 // Device error or disconnected
-                debug_force("Read failed with error: %d\n", errno);
                 break;
             } else if (bytesRead == 0) {
                 // EOF - device disconnected
@@ -117,7 +116,6 @@ bool USBDevice::writeData(std::vector<uint8_t> data) {
         return true;
     }
 
-    debug_force("Raw write failed: %s (wrote %zd of %zu bytes)\n", strerror(errno), bytesWritten, data.size());
     return false;
 }
 #endif
