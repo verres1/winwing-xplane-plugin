@@ -459,9 +459,9 @@ void TolissFCUEfisProfile::updateDisplayData(FCUDisplayData &data) {
         float baroValue = datarefManager->getCached<float>(isCaptain ? "sim/cockpit2/gauges/actuators/barometer_setting_in_hg_pilot" : "sim/cockpit2/gauges/actuators/barometer_setting_in_hg_copilot");
 
         EfisDisplayValue value = {
-            .baro = "",
             .displayEnabled = datarefManager->getCached<bool>("AirbusFBW/FCUAvail"),
             .displayTest = datarefManager->getCached<int>("AirbusFBW/AnnunMode") == 2,
+            .baro = "",
             .unitIsInHg = false,
             .isStd = isStd,
         };

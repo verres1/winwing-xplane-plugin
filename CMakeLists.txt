@@ -123,7 +123,10 @@ FUNCTION(add_xplane_sdk_definitions library_name library_version)
         TARGET_LINK_OPTIONS(${library_name} PRIVATE -pthread -static-libstdc++ -static-libgcc -Wl,--allow-multiple-definition 
             "-Wl,--defsym,_Z18HidD_GetAttributesPvP16_HIDD_ATTRIBUTES=HidD_GetAttributes"
             "-Wl,--defsym,_Z26HidD_GetManufacturerStringPvS_m=HidD_GetManufacturerString" 
-            "-Wl,--defsym,_Z21HidD_GetProductStringPvS_m=HidD_GetProductString")
+            "-Wl,--defsym,_Z21HidD_GetProductStringPvS_m=HidD_GetProductString"
+            "-Wl,--defsym,_Z21HidD_GetPreparsedDataPvPP20_HIDP_PREPARSED_DATA=HidD_GetPreparsedData"
+            "-Wl,--defsym,_Z12HidP_GetCapsP20_HIDP_PREPARSED_DATAP10_HIDP_CAPS=HidP_GetCaps"
+            "-Wl,--defsym,_Z22HidD_FreePreparsedDataP20_HIDP_PREPARSED_DATA=HidD_FreePreparsedData")
     ENDIF()
 
     IF(library_version EQUAL 200)
@@ -222,14 +225,9 @@ FUNCTION(add_xplane_plugin library_name library_version src_dir)
             TARGET_LINK_LIBRARIES(${library_name} PUBLIC ${IOKIT_LIBRARY} ${COREFOUNDATION_LIBRARY})
         ENDIF()
     ELSEIF(WIN32)
-        # Link Windows HID and Setup API libraries with full paths
-        FIND_LIBRARY(HID_LIBRARY hid PATHS /usr/x86_64-w64-mingw32/lib)
-        FIND_LIBRARY(SETUPAPI_LIBRARY setupapi PATHS /usr/x86_64-w64-mingw32/lib)
-        IF(HID_LIBRARY AND SETUPAPI_LIBRARY)
-            TARGET_LINK_LIBRARIES(${library_name} PUBLIC ${HID_LIBRARY} ${SETUPAPI_LIBRARY})
-        ELSE()
-            TARGET_LINK_LIBRARIES(${library_name} PUBLIC hid setupapi)
-        ENDIF()
+        # Link Windows HID and Setup API libraries
+        # Use --start-group/--end-group to resolve circular dependencies
+        TARGET_LINK_LIBRARIES(${library_name} PUBLIC "-Wl,--start-group" setupapi hid hidparse "-Wl,--end-group")
     ELSEIF(UNIX)
         FIND_PACKAGE(PkgConfig REQUIRED)
         PKG_CHECK_MODULES(UDEV REQUIRED libudev)

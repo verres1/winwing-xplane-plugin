@@ -52,7 +52,7 @@ sudo chown -R $(id -u):$(id -g) dist/ 2>/dev/null || true
 # Get version from config.h
 VERSION=$(grep "#define VERSION" src/include/config.h | cut -d '"' -f 2)
 if [ -z "$VERSION" ]; then
-    VERSION="0.0.17"
+    VERSION="0.0.17.2"
 fi
 
 # Get SDK version for package naming
@@ -82,16 +82,6 @@ fi
 
 # Copy documentation
 cp README.md "$PACKAGE_DIR/" 2>/dev/null || echo "No README found"
-
-# Only add Skunkcrafts for XP12
-if [ $SDK_VERSION -ge 400 ]; then
-    echo "module|https://ramonster.nl/winwing-plugin
-name|Winwing
-version|$VERSION
-locked|false
-disabled|false
-zone|custom" > "$PACKAGE_DIR/skunkcrafts_updater.cfg"
-fi
 
 # Create zip package
 cd dist

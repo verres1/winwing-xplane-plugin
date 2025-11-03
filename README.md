@@ -1,7 +1,11 @@
-Fork of rswilem winwing-xplane-plugin and Belnadifia repository
-On top of official winwing-xplane-plugin I have added support for PAP3 in FF777V2 and RotateMD11
-I have added threading for PFP thanks to Belnadifia repository
-This repo is using custom build system
+## About This Fork
+
+This is a fork of [rswilem's winwing-xplane-plugin](https://github.com/rswilem/winwing-xplane-plugin) with contributions from [Belnadifia's repository](https://github.com/Belnadifia/winwing-xplane-plugin).
+
+**Additional features in this fork:**
+- Panel of Autopilot 3 (PAP3) support for Flight Factor 777 V2 and Rotate MD-11
+- Enhanced PFP threading implementation (based on Belnadifia's work)
+- Custom build system for streamlined development
 
 ## Winwing plugin for X-Plane 12
 
@@ -42,7 +46,7 @@ For detailed build instructions, see [BUILD.md](BUILD.md).
 
 The matrix below shows device and aircraft compatibility. Devices are listed vertically, aircraft horizontally.
 
-| Device                      | Toliss A3xx | Laminar A330 | AeroGenesis A330 | Zibo 737 | IXEG 737 | FF 767/777 | SSG 747 | Rotate MD11  |
+| Device                      | Toliss A3xx | Laminar A330 | AeroGenesis A330 | Zibo 737 | IXEG 737 | FF777 | SSG 747 | Rotate MD11  |
 | --------------------------- | ----------- | ------------ | ---------------- | -------- | -------- | ---------- | ------- | ------------ |
 | **URSA MINOR Joystick L+R** | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟢      | 🟢           |
 | **MCDU-32**                 | 🟢          | 🟢           | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      | 🟢           |
