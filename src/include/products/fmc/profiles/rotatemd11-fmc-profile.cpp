@@ -64,6 +64,10 @@ bool RotateMD11FMCProfile::IsEligible() {
     return Dataref::getInstance()->exists("Rotate/aircraft/controls/cdu_0/mcdu_line_0_content");
 }
 
+bool RotateMD11FMCProfile::shouldReadDatarefAsBytes(const std::string &dataref) const {
+    return dataref.find("_style") != std::string::npos;
+}
+
 const std::vector<std::string> &RotateMD11FMCProfile::displayDatarefs() const {
     static const std::vector<std::string> datarefs = {
         "Rotate/aircraft/controls/cdu_0/mcdu_line_0_content",
@@ -263,114 +267,6 @@ std::string RotateMD11FMCProfile::processUTF8Arrows(const std::string &input) {
     return output;
 }
 
-std::vector<int> RotateMD11FMCProfile::buildStylePositionMap(const std::string &content, const std::string &style) {
-    // Build mapping: content position -> style index
-    // Rules: 
-    // - Last word (after 2+ spaces): maps to end of style array, skips 2+ space sequences
-    // - Beginning content: maps to beginning of style array, skips 2+ space sequences
-    
-    std::vector<int> positionMap(content.length(), -1);
-    
-    // Find last word boundaries
-    int lastWordEnd = content.length();
-    int trailingSpaces = 0;
-    
-    for (int i = content.length() - 1; i >= 0; i--) {
-        if (content[i] == ' ' || content[i] == 0x00) {
-            trailingSpaces++;
-        } else {
-            lastWordEnd = (trailingSpaces == 1) ? i + 2 : i + 1;
-            break;
-        }
-    }
-    
-    int lastWordStart = lastWordEnd;
-    for (int i = lastWordEnd - 1; i >= 0; i--) {
-        // Look for 2+ consecutive spaces to find last word boundary
-        if (i >= 1 && content[i] == ' ' && content[i-1] == ' ') {
-            lastWordStart = i + 1;
-            break;
-        }
-        if (i == 0) {
-            lastWordStart = 0;
-            break;
-        }
-    }
-    
-    // Count style values needed for last word (skip 2+ space sequences)
-    int lastWordStyleCount = 0;
-    for (int i = lastWordStart; i < lastWordEnd; ) {
-        if (content[i] == ' ') {
-            int spaceCount = 0;
-            while (i < lastWordEnd && content[i] == ' ') {
-                spaceCount++;
-                i++;
-            }
-            if (spaceCount < 2) {
-                lastWordStyleCount += spaceCount;
-            }
-        } else {
-            lastWordStyleCount++;
-            i++;
-        }
-    }
-    
-    // Map last word to end of style array
-    if (lastWordStyleCount > 0 && lastWordStyleCount <= style.size()) {
-        int styleIdx = style.size() - lastWordStyleCount;
-        
-        for (int pos = lastWordStart; pos < lastWordEnd; ++pos) {
-            if (content[pos] == ' ') {
-                // Count consecutive spaces at this position
-                int spaceCount = 1;
-                for (int j = pos + 1; j < lastWordEnd && content[j] == ' '; j++) spaceCount++;
-                for (int j = pos - 1; j >= lastWordStart && content[j] == ' '; j--) spaceCount++;
-                
-                if (spaceCount < 2) {
-                    positionMap[pos] = styleIdx++;
-                }
-            } else {
-                positionMap[pos] = styleIdx++;
-            }
-        }
-    }
-    
-    // Mark 2+ space sequences in beginning content
-    for (int i = 0; i < lastWordStart; ) {
-        if (content[i] == ' ') {
-            int spaceCount = 0;
-            int spaceStart = i;
-            while (i < lastWordStart && content[i] == ' ') {
-                spaceCount++;
-                i++;
-            }
-            if (spaceCount < 2) {
-                // Single space is encoded, will be mapped below
-            } else {
-                // Mark 2+ spaces as skipped
-                for (int j = spaceStart; j < spaceStart + spaceCount; j++) {
-                    if (positionMap[j] < 0) {
-                        positionMap[j] = -2;  // -2 means explicitly skipped
-                    }
-                }
-            }
-        } else {
-            i++;
-        }
-    }
-    
-    // Map beginning content to beginning of style array
-    int styleIdx = 0;
-    for (int pos = 0; pos < lastWordStart; ++pos) {
-        if (positionMap[pos] == -1) {  // Not yet mapped
-            positionMap[pos] = styleIdx++;
-        } else if (positionMap[pos] == -2) {
-            positionMap[pos] = -1;  // Restore to "no mapping"
-        }
-    }
-    
-    return positionMap;
-}
 
 void RotateMD11FMCProfile::mapCharacter(std::vector<uint8_t> *buffer, uint8_t character, bool isFontSmall) {
     switch (character) {
@@ -419,14 +315,10 @@ void RotateMD11FMCProfile::updatePage(std::vector<std::vector<char>> &page) {
             continue;
         }
         
-        // Convert UTF-8 arrows to ASCII codes
         std::string processedContent = processUTF8Arrows(contentStr);
         
-        // Read style and build position mapping
-        std::string styleStr = datarefManager->getCached<std::string>(styleRef.c_str());
-        std::vector<int> positionToStyleIndex = buildStylePositionMap(processedContent, styleStr);
+        std::vector<unsigned char> styleBytes = datarefManager->getCached<std::vector<unsigned char>>(styleRef.c_str());
         
-        // Render all characters with their mapped styles
         for (int pos = 0; pos < ProductFMC::PageCharsPerLine && pos < processedContent.length(); ++pos) {
             unsigned char c = static_cast<unsigned char>(processedContent[pos]);
             
@@ -434,10 +326,9 @@ void RotateMD11FMCProfile::updatePage(std::vector<std::vector<char>> &page) {
                 continue;
             }
             
-            // Get style code from mapping
-            int styleCode = 4;  // Default small font
-            if (positionToStyleIndex[pos] >= 0 && positionToStyleIndex[pos] < styleStr.size()) {
-                styleCode = (unsigned char)styleStr[positionToStyleIndex[pos]];
+            int styleCode = 4;
+            if (pos < styleBytes.size()) {
+                styleCode = styleBytes[pos];
             }
             
             bool fontSmall = (styleCode == 4);
