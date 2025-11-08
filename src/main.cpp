@@ -4,11 +4,8 @@
 
 #include "appstate.h"
 #include "config.h"
-#include "dataref.h"
 #include "usbcontroller.h"
 
-#include <algorithm>
-#include <cmath>
 #include <cstring>
 #include <XPLMDisplay.h>
 #include <XPLMMenus.h>

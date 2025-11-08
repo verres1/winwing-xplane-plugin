@@ -43,14 +43,70 @@ brew install cmake
 Build for your current platform:
 
 ```bash
-./build.sh
+./build.sh [OPTIONS]
 ```
 
-This will:
+#### Build Options
+
+- **Release build (default - optimized, no debug symbols):**
+  ```bash
+  ./build.sh
+  # or explicitly:
+  ./build.sh --release
+  ```
+
+- **Debug build (no optimization, with debug symbols):**
+  ```bash
+  ./build.sh --debug
+  ```
+
+- **Clean build (remove build directory first):**
+  ```bash
+  ./build.sh --clean
+  ```
+
+- **Combine options:**
+  ```bash
+  ./build.sh --clean --release
+  ./build.sh --clean --debug
+  ```
+
+- **Show help:**
+  ```bash
+  ./build.sh --help
+  ```
+
+#### Build Process
+
+The script will:
 1. Detect your platform (Linux, macOS, or Windows)
 2. Configure CMake with appropriate settings
-3. Build the plugin
+3. Build the plugin with the selected optimization level:
+   - **Release:** `-O3` optimization, `NDEBUG` defined, no debug symbols
+   - **Debug:** `-O0` (no optimization), `-g` debug symbols
 4. Output the plugin to `build/[platform]_x64/winwing.xpl`
+5. **Automatically strip debug symbols** in Release builds (shows size reduction)
+6. Display plugin size (before and after stripping for Release builds)
+
+#### Optimization Levels
+
+- **Release builds** (`-O3`):
+  - Maximum optimization for production use
+  - Smaller binary size
+  - Better runtime performance
+  - No debug symbols (automatically stripped)
+  - All assertions disabled (`NDEBUG`)
+  - Uses platform-appropriate strip commands:
+    - Linux: `strip --strip-all`
+    - macOS: `strip -x`
+    - Windows: `strip --strip-all`
+
+- **Debug builds** (`-O0`):
+  - No optimization for easier debugging
+  - Full debug symbols (`-g`)
+  - Larger binary size
+  - Easier to debug with GDB/LLDB
+  - All assertions enabled
 
 ### Method 2: Docker Multi-Platform Build (Recommended)
 

@@ -27,6 +27,14 @@ public:
 
     uint8_t mcpPowerMask() const override;
     bool    mcpHasPower() const override;
+    
+    LcdDisplayConfig getLcdDisplayConfig() const override {
+        LcdDisplayConfig config;
+        config.showLabels = true;
+        config.showDashesWhenInactive = true;
+        config.showLabelsWhenInactive = true;
+        return config;
+    }
 
     // Input hooks
     void onButton(std::uint8_t off, std::uint8_t mask, bool pressed) override;
@@ -102,6 +110,7 @@ private:
     XPLMDataRef _drProfEngaged{nullptr};   // Rotate/aircraft/systems/afs_prof_engaged
     XPLMDataRef _drFmsSpdEngaged{nullptr}; // Rotate/aircraft/systems/afs_fms_spd_engaged
     XPLMDataRef _drHdgTrkSel{nullptr};     // Rotate/aircraft/systems/gcp_hdg_trk_sel_set
+    XPLMDataRef _drHdgTrkPresel{nullptr};  // Rotate/aircraft/systems/gcp_hdg_trk_presel_set
 
     // --- Control datarefs (for momentary buttons) ---
     XPLMDataRef _drCtrlNav{nullptr};         // Rotate/aircraft/controls/fgs_nav
@@ -140,7 +149,6 @@ private:
     // --- Debounce & guards ---
     float _lastButtonTime{0.0f};
     bool  _backlightInitialized{false};  // Track if backlight has been set after startup
-    bool  _hdgTrkSelInitialized{false};  // Workaround: track if HDG/TRK selector has been properly initialized
 
     // Momentary buttons mapping (offset/mask -> dataref to write)
     struct BtnDataRefBinding {

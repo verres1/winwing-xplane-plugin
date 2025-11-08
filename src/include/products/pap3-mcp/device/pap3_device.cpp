@@ -4,7 +4,6 @@
 #include "../lcd/compose.h"
 #include "../profiles/profile_factory.h"
 #include "../aircraft/pap3_aircraft.h"
-#include "../menu/pap3_menu.h"
 
 #include "inputs.h"
 #include "usbcontroller.h"
@@ -446,12 +445,35 @@ void PAP3Device::applyState(const aircraft::State& st)
     s.digitA  = st.digitA;
     s.digitB  = st.digitB;
 
-    const bool show = pap3menu::GetShowLcdLabels();
-    s.lblIAS = show; s.lblHDG = show; s.lblVS  = show;
+    if (_profile) {
+        const auto lcdConfig = _profile->getLcdDisplayConfig();
+        
+        s.lblIAS = lcdConfig.showLabels || (lcdConfig.showLabelsWhenInactive && !st.spdVisible);
+        s.lblHDG = lcdConfig.showLabels || (lcdConfig.showLabelsWhenInactive && !st.hdgVisible);
+        s.lblVS  = lcdConfig.showLabels || (lcdConfig.showLabelsWhenInactive && !st.vviVisible);
+    } else {
+        s.lblIAS = s.lblHDG = s.lblVS = false;
+    }
 
     s.dotSpd = s.dotAlt = s.dotVvi = s.dotCrsCapt = s.dotCrsFo = s.dotHdg = false;
 
-    const auto payload = lcdc::build(s);
+    auto payload = lcdc::build(s);
+    
+    if (_profile) {
+        const auto lcdConfig = _profile->getLcdDisplayConfig();
+        if (lcdConfig.showDashesWhenInactive) {
+            if (!st.spdVisible) {
+                lcdc::drawSpdDashes(payload);
+            }
+            if (!st.hdgVisible) {
+                lcdc::drawHdgDashes(payload);
+            }
+            if (!st.vviVisible) {
+                lcdc::drawVviDashes(payload);
+            }
+        }
+    }
+    
     std::vector<std::uint8_t> lcd32(payload.begin(), payload.end());
     qLcdPayload(lcd32);
 

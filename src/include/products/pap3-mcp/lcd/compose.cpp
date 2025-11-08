@@ -237,4 +237,23 @@ Payload build(const Snapshot& s) {
     return p;
 }
 
+void drawSpdDashes(Payload& p) {
+    seg::drawDash(seg::G0, p, seg::SPD_HUNDREDS);
+    seg::drawDash(seg::G0, p, seg::SPD_TENS);
+    seg::drawDash(seg::G0, p, seg::SPD_UNITS);
+}
+
+void drawHdgDashes(Payload& p) {
+    seg::drawDash(seg::G1, p, seg::HDG_HUNDREDS);
+    seg::drawDash(seg::G1, p, seg::HDG_TENS);
+    seg::drawDash(seg::G1, p, seg::HDG_UNITS);
+}
+
+void drawVviDashes(Payload& p) {
+    seg::drawDash(seg::G2, p, seg::VSPD_KILO);
+    seg::drawDash(seg::G2, p, seg::VSPD_HUNDREDS);
+    seg::drawDash(seg::G2, p, seg::VSPD_TENS);
+    seg::drawDash(seg::G2, p, seg::VSPD_UNITS);
+}
+
 } // namespace pap3::lcd::compose

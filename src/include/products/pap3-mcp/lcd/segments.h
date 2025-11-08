@@ -186,6 +186,8 @@ void drawDigit(const GroupOffsets& g, Payload& p, uint8_t flag, int digit);
 
 void drawLetterA(const GroupOffsets& g, Payload& p, uint8_t flag);
 
+void drawDash(const GroupOffsets& g, Payload& p, uint8_t flag);
+
 /// Utility to set/clear a single bit at an absolute offset.
 void setFlag(Payload& p, uint8_t absOffset, uint8_t mask, bool enable);
 

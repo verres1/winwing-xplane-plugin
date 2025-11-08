@@ -21,6 +21,16 @@ namespace PowerBits {
     constexpr std::uint8_t DC_BUS_2    = 0x04; // Bit 2: DC Bus 2
 } // namespace PowerBits
 
+struct LcdDisplayConfig {
+    bool showLabels = false;
+    bool showDashesWhenInactive = false;
+    bool showLabelsWhenInactive = false;
+};
+
+inline LcdDisplayConfig DefaultLcdConfig() {
+    return LcdDisplayConfig{};
+}
+
 // -----------------------------------------------------------------------------
 // State structure: canonical values for PAP3
 // -----------------------------------------------------------------------------
@@ -171,6 +181,10 @@ public:
      * Default: true (powered).
      */
     virtual bool mcpHasPower() const { return true; }
+
+    virtual LcdDisplayConfig getLcdDisplayConfig() const {
+        return DefaultLcdConfig();
+    }
 
     virtual void syncSimToHardware() {}
 

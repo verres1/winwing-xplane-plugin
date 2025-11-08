@@ -75,4 +75,8 @@ void drawLetterA(const GroupOffsets& g, Payload& p, uint8_t flag) {
     applyOnePos(p, g.top,  flag, (kLetterA & A) != 0);
 }
 
+void drawDash(const GroupOffsets& g, Payload& p, uint8_t flag) {
+    applyOnePos(p, g.mid, flag, true);
+}
+
 } // namespace pap3::lcd::segments

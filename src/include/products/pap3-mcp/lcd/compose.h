@@ -62,4 +62,8 @@ struct Snapshot {
 /// The returned buffer is ready to be copied at [0x19..] in the 0x38 LCD frame.
 Payload build(const Snapshot& s);
 
+void drawSpdDashes(Payload& p);
+void drawHdgDashes(Payload& p);
+void drawVviDashes(Payload& p);
+
 } // namespace pap3::lcd::compose

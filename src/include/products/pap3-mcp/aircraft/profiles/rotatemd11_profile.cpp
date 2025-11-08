@@ -50,6 +50,7 @@ RotateMD11PAP3Profile::RotateMD11PAP3Profile() {
     _drProfEngaged    = DR("Rotate/aircraft/systems/afs_prof_engaged");
     _drFmsSpdEngaged  = DR("Rotate/aircraft/systems/afs_fms_spd_engaged");
     _drHdgTrkSel      = DR("Rotate/aircraft/systems/gcp_hdg_trk_sel_set");
+    _drHdgTrkPresel   = DR("Rotate/aircraft/systems/gcp_hdg_trk_presel_set");
 
     // Control datarefs (for momentary buttons)
     _drCtrlNav          = DR("Rotate/aircraft/controls/fgs_nav");
@@ -146,7 +147,6 @@ void RotateMD11PAP3Profile::start(StateCallback onChanged) {
     _cb = std::move(onChanged);
     _running = true;
     _backlightInitialized = false;  // Reset backlight initialization flag
-    _hdgTrkSelInitialized = false;  // Reset HDG/TRK selector initialization flag
 }
 
 void RotateMD11PAP3Profile::stop() {
@@ -202,27 +202,12 @@ void RotateMD11PAP3Profile::poll() {
         if (_state.hdg < 0) _state.hdg += 360;  // Handle negative values
     }
     
-    // Control HDG LCD visibility based on HDG/TRK selector
-    // Workaround for aircraft bug: first value is 0 but should be 1 on startup
-    if (_drHdgTrkSel) {
-        const int hdgTrkSel = dr_get_int(_drHdgTrkSel);
-        
-        if (!_hdgTrkSelInitialized) {
-            // Not yet initialized - handle first values
-            if (hdgTrkSel == 0) {
-                // First value is 0 (bug) - treat as 1
-                _state.hdgVisible = true;
-            } else if (hdgTrkSel == 1) {
-                // Received proper value of 1 - mark as initialized and use it
-                _hdgTrkSelInitialized = true;
-                _state.hdgVisible = true;
-            }
-        } else {
-            // Already initialized - use value directly
-            _state.hdgVisible = (hdgTrkSel == 1);  // Active when HDG mode (1), inactive when TRK mode (0)
-        }
+    if (_drRollMode && _drHdgTrkPresel) {
+        const int rollMode = dr_get_int(_drRollMode);
+        const int hdgTrkPresel = dr_get_int(_drHdgTrkPresel);
+        _state.hdgVisible = !(rollMode == 1 && hdgTrkPresel == 0);
     } else {
-        _state.hdgVisible = true;  // Default to visible if dataref not available
+        _state.hdgVisible = true;
     }
     if (_drAlt) {
         _state.alt = dr_get_int(_drAlt);

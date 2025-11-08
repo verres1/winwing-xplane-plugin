@@ -28,6 +28,13 @@ public:
     uint8_t mcpPowerMask() const override;
     bool    mcpHasPower() const override;
 
+    LcdDisplayConfig getLcdDisplayConfig() const override {
+        LcdDisplayConfig config;
+        config.showLabels = true;
+        config.showDashesWhenInactive = false;
+        return config;
+    }
+
     // Input hooks
     void onButton(std::uint8_t off, std::uint8_t mask, bool pressed) override;
     void onEncoderDelta(std::uint8_t posOff, std::int8_t delta) override;
