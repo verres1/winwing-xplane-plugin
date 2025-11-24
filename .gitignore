@@ -7,6 +7,7 @@ dist/
 .cache/
 .vscode/
 .DS_Store/
+.idea/
 Winwing.xcodeproj/
 
 

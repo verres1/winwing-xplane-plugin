@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "dataref.h"
+#include "SimpleIni.h"
 #include "usbcontroller.h"
 #include "usbdevice.h"
 
@@ -60,7 +61,7 @@ float AppState::Update(float inElapsedSinceLastCall, float inElapsedTimeSinceLas
 
     appstate->update();
 
-    if (!USBController::getInstance()->allProfilesReady()) {
+    if (!USBController::getInstance()->anyProfileReady()) {
         return REFRESH_INTERVAL_SECONDS_SLOW;
     }
 
@@ -76,9 +77,9 @@ void AppState::update() {
     }
 
     taskQueue.erase(std::remove_if(taskQueue.begin(), taskQueue.end(), [&](auto &task) {
-                        return now >= task.runAt;
-                    }),
-                    taskQueue.end());
+        return now >= task.runAt;
+    }),
+        taskQueue.end());
 
     if (!pluginInitialized) {
         return;
@@ -93,8 +94,8 @@ void AppState::update() {
 
 void AppState::executeAfter(int milliseconds, std::function<void()> func) {
     taskQueue.push_back({"",
-                         std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds),
-                         func});
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds),
+        func});
 }
 
 void AppState::executeAfterDebounced(std::string taskName, int milliseconds, std::function<void()> func) {
@@ -109,4 +110,43 @@ void AppState::executeAfterDebounced(std::string taskName, int milliseconds, std
     } else {
         taskQueue.push_back({taskName, now + std::chrono::milliseconds(milliseconds), func});
     }
+}
+
+std::string AppState::readPreference(const std::string &key, const std::string &defaultValue) {
+    CSimpleIniA ini;
+    ini.SetUnicode();
+    SI_Error rc = ini.LoadFile((getPluginDirectory() + "/preferences.ini").c_str());
+    if (rc < 0) {
+        return defaultValue;
+    }
+
+    const char *value = ini.GetValue("Preferences", key.c_str(), defaultValue.c_str());
+    return std::string(value);
+}
+
+void AppState::writePreference(const std::string &key, const std::string &value) {
+    CSimpleIniA ini;
+    ini.SetUnicode();
+    SI_Error rc = ini.LoadFile((getPluginDirectory() + "/preferences.ini").c_str());
+    if (rc < 0) {
+        // File might not exist yet, continue
+    }
+
+    ini.SetValue("Preferences", key.c_str(), value.c_str());
+
+    rc = ini.SaveFile((getPluginDirectory() + "/preferences.ini").c_str());
+    if (rc < 0) {
+        debug_force("Failed to save preferences file.\n");
+    }
+}
+
+std::string AppState::getPluginDirectory() {
+    char systemPath[512];
+    XPLMGetSystemPath(systemPath);
+    std::string rootDirectory = systemPath;
+    if (rootDirectory.ends_with("/")) {
+        rootDirectory = rootDirectory.substr(0, rootDirectory.length() - 1); // Remove trailing slash
+    }
+
+    return rootDirectory + PLUGIN_DIRECTORY;
 }

@@ -32,6 +32,7 @@ class ProductFMC : public USBDevice {
         std::set<int> pressedButtonIndices;
         uint64_t lastButtonStateLo;
         uint32_t lastButtonStateHi;
+        int menuItemId;
 
         // I/O worker thread
         std::thread              _ioThread;

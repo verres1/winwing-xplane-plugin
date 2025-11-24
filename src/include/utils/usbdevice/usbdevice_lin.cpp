@@ -39,6 +39,7 @@ bool USBDevice::connect() {
                 InputReportCallback(this, (int) bytesRead, buffer);
             } else if (bytesRead < 0) {
                 // Device error or disconnected
+                debug_force("Read failed with error: %d\n", errno);
                 break;
             } else if (bytesRead == 0) {
                 // EOF - device disconnected
@@ -51,6 +52,9 @@ bool USBDevice::connect() {
         debug("Input thread exiting\n");
     });
     inputThread.detach();
+
+    writeThreadRunning = true;
+    writeThread = std::thread(&USBDevice::writeThreadLoop, this);
 
     return true;
 }
@@ -83,10 +87,21 @@ void USBDevice::update() {
 }
 
 void USBDevice::disconnect() {
+    // Wait for write queue to drain before disconnecting
+    while (cachedWriteQueueSize.load() > 0 && writeThreadRunning) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
     connected = false;
 
     // Give input thread time to exit
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+    writeThreadRunning = false;
+    writeQueueCV.notify_all();
+    if (writeThread.joinable()) {
+        writeThread.join();
+    }
 
     if (hidDevice >= 0) {
         close(hidDevice);
@@ -111,11 +126,43 @@ bool USBDevice::writeData(std::vector<uint8_t> data) {
         return false;
     }
 
-    ssize_t bytesWritten = write(hidDevice, data.data(), data.size());
-    if (bytesWritten == (ssize_t) data.size()) {
-        return true;
+    {
+        std::lock_guard<std::mutex> lock(writeQueueMutex);
+        writeQueue.push(std::move(data));
+        cachedWriteQueueSize.store(writeQueue.size());
     }
+    writeQueueCV.notify_one();
 
-    return false;
+    return true;
+}
+
+void USBDevice::writeThreadLoop() {
+    while (writeThreadRunning) {
+        std::vector<uint8_t> data;
+
+        {
+            std::unique_lock<std::mutex> lock(writeQueueMutex);
+            writeQueueCV.wait(lock, [this] {
+                return !writeQueue.empty() || !writeThreadRunning;
+            });
+
+            if (!writeThreadRunning) {
+                break;
+            }
+
+            if (!writeQueue.empty()) {
+                data = std::move(writeQueue.front());
+                writeQueue.pop();
+                cachedWriteQueueSize.store(writeQueue.size());
+            }
+        }
+
+        if (!data.empty() && hidDevice >= 0 && connected) {
+            ssize_t bytesWritten = write(hidDevice, data.data(), data.size());
+            if (bytesWritten != (ssize_t) data.size()) {
+                debug_force("Raw write failed: %s (wrote %zd of %zu bytes)\n", strerror(errno), bytesWritten, data.size());
+            }
+        }
+    }
 }
 #endif

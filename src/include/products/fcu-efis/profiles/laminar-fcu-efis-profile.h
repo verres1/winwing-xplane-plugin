@@ -16,7 +16,7 @@ class LaminarFCUEfisProfile : public FCUEfisAircraftProfile {
 
         // Override base class methods
         const std::vector<std::string> &displayDatarefs() const override;
-        const std::vector<FCUEfisButtonDef> &buttonDefs() const override;
+        const std::unordered_map<uint16_t, FCUEfisButtonDef> &buttonDefs() const override;
         void updateDisplayData(FCUDisplayData &data) override;
 
         bool hasEfisLeft() const override {
@@ -30,4 +30,4 @@ class LaminarFCUEfisProfile : public FCUEfisAircraftProfile {
         void buttonPressed(const FCUEfisButtonDef *button, XPLMCommandPhase phase) override;
 };
 
-#endif // LAMINAR_FCU_EFIS_PROFILE_H
+#endif

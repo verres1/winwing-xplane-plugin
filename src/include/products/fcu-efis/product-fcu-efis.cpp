@@ -4,6 +4,7 @@
 #include "config.h"
 #include "dataref.h"
 #include "profiles/laminar-fcu-efis-profile.h"
+#include "profiles/laminar737-fcu-efis-profile.h"
 #include "profiles/toliss-fcu-efis-profile.h"
 
 #include <algorithm>
@@ -98,17 +99,17 @@ void ProductFCUEfis::setProfileForCurrentAircraft() {
     if (TolissFCUEfisProfile::IsEligible()) {
         profile = new TolissFCUEfisProfile(this);
         profileReady = true;
+    } else if (Laminar737FCUEfisProfile::IsEligible()) {
+        profile = new Laminar737FCUEfisProfile(this);
+        profileReady = true;
     } else if (LaminarFCUEfisProfile::IsEligible()) {
         profile = new LaminarFCUEfisProfile(this);
         profileReady = true;
-    } else {
-        debug("No profile found for %s.\n", classIdentifier());
-        clearDisplays();
     }
 }
 
 const char *ProductFCUEfis::classIdentifier() {
-    return "Product-FCU-EFIS";
+    return "FCU-EFIS";
 }
 
 bool ProductFCUEfis::connect() {
@@ -197,8 +198,7 @@ void ProductFCUEfis::update() {
 
     USBDevice::update();
 
-    // Rate limit display updates to ~30Hz, unless forced
-    if (++displayUpdateFrameCounter >= DISPLAY_UPDATE_FRAME_INTERVAL) {
+    if (++displayUpdateFrameCounter >= getDisplayUpdateFrameInterval()) {
         displayUpdateFrameCounter = 0;
         updateDisplays();
     }
@@ -358,7 +358,7 @@ void ProductFCUEfis::sendFCUDisplay(const std::string &speed, const std::string 
 
     // First request - send display data
     std::vector<uint8_t> data1 = {
-        0xF0, 0x00, packetNumber, 0x31, ProductFCUEfis::IdentifierByte, 0xBB, 0x00, 0x00, 0x02, 0x01, 0x00, 0x00, 0xFF, 0xFF, 0x02, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        0xF0, 0x00, packetNumber, 0x31, ProductFCUEfis::FCUIdentifierByte, 0xBB, 0x00, 0x00, 0x02, 0x01, 0x00, 0x00, 0xFF, 0xFF, 0x02, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     // Add speed data (3 bytes)
     data1.push_back(speedData[2]);
@@ -389,12 +389,12 @@ void ProductFCUEfis::sendFCUDisplay(const std::string &speed, const std::string 
     while (data1.size() < 64) {
         data1.push_back(0x00);
     }
-    
+
     writeData(data1);
 
     // Second request - commit display data
     std::vector<uint8_t> data2 = {
-        0xF0, 0x00, packetNumber, 0x11, ProductFCUEfis::IdentifierByte, 0xBB, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0xFF, 0xFF, 0x02, 0x00};
+        0xF0, 0x00, packetNumber, 0x11, ProductFCUEfis::FCUIdentifierByte, 0xBB, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0xFF, 0xFF, 0x02, 0x00};
 
     // Pad to 64 bytes
     while (data2.size() < 64) {
@@ -418,7 +418,7 @@ void ProductFCUEfis::sendEfisDisplayWithFlags(EfisDisplayValue *data, bool isRig
 
     // EFIS display protocol
     std::vector<uint8_t> payload = {
-        0xF0, 0x00, packetNumber, 0x1A, static_cast<uint8_t>(isRightSide ? 0x0E : 0x0D), 0xBF, 0x00, 0x00, 0x02, 0x01, 0x00, 0x00, 0xFF, 0xFF, 0x1D, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        0xF0, 0x00, packetNumber, 0x1A, static_cast<uint8_t>(isRightSide ? ProductFCUEfis::EfisRightIdentifierByte : ProductFCUEfis::EfisLeftIdentifierByte), 0xBF, 0x00, 0x00, 0x02, 0x01, 0x00, 0x00, 0xFF, 0xFF, 0x1D, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     // Add barometric data
     auto baroData = encodeStringEfis(4, fixStringLength(data->isStd ? "STD " : data->baro, 4));
@@ -458,13 +458,13 @@ void ProductFCUEfis::setLedBrightness(FCUEfisLed led, uint8_t brightness) {
 
     if (ledValue < 100) {
         // FCU LEDs
-        data = {0x02, ProductFCUEfis::IdentifierByte, 0xBB, 0x00, 0x00, 0x03, 0x49, static_cast<uint8_t>(ledValue), brightness, 0x00, 0x00, 0x00, 0x00, 0x00};
+        data = {0x02, ProductFCUEfis::FCUIdentifierByte, 0xBB, 0x00, 0x00, 0x03, 0x49, static_cast<uint8_t>(ledValue), brightness, 0x00, 0x00, 0x00, 0x00, 0x00};
     } else if (ledValue < 200) {
         // EFIS Right LEDs
-        data = {0x02, 0x0E, 0xBF, 0x00, 0x00, 0x03, 0x49, static_cast<uint8_t>(ledValue - 100), brightness, 0x00, 0x00, 0x00, 0x00, 0x00};
+        data = {0x02, ProductFCUEfis::EfisRightIdentifierByte, 0xBF, 0x00, 0x00, 0x03, 0x49, static_cast<uint8_t>(ledValue - 100), brightness, 0x00, 0x00, 0x00, 0x00, 0x00};
     } else if (ledValue < 300) {
         // EFIS Left LEDs
-        data = {0x02, 0x0D, 0xBF, 0x00, 0x00, 0x03, 0x49, static_cast<uint8_t>(ledValue - 200), brightness, 0x00, 0x00, 0x00, 0x00, 0x00};
+        data = {0x02, ProductFCUEfis::EfisLeftIdentifierByte, 0xBF, 0x00, 0x00, 0x03, 0x49, static_cast<uint8_t>(ledValue - 200), brightness, 0x00, 0x00, 0x00, 0x00, 0x00};
     }
 
     if (!data.empty()) {
@@ -550,17 +550,15 @@ void ProductFCUEfis::didReceiveData(int reportId, uint8_t *report, int reportLen
 }
 
 void ProductFCUEfis::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count) {
-    const FCUEfisButtonDef *buttonDef = nullptr;
-    for (const auto &btn : profile->buttonDefs()) {
-        if (btn.id == hardwareButtonIndex) {
-            buttonDef = &btn;
-            break;
-        }
-    }
+    USBDevice::didReceiveButton(hardwareButtonIndex, pressed, count);
 
-    if (!buttonDef) {
+    auto &buttons = profile->buttonDefs();
+    auto it = buttons.find(hardwareButtonIndex);
+    if (it == buttons.end()) {
         return;
     }
+
+    const FCUEfisButtonDef *buttonDef = &it->second;
 
     if (buttonDef->dataref.empty()) {
         return;

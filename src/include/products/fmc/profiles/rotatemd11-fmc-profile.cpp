@@ -195,6 +195,31 @@ const std::vector<FMCButtonDef> &RotateMD11FMCProfile::buttonDefs() const {
     return buttons;
 }
 
+const std::unordered_map<FMCKey, const FMCButtonDef *> &RotateMD11FMCProfile::buttonKeyMap() const {
+    static std::unordered_map<FMCDeviceVariant, std::unordered_map<FMCKey, const FMCButtonDef *>> cache;
+
+    auto it = cache.find(product->deviceVariant);
+    if (it == cache.end()) {
+        std::unordered_map<FMCKey, const FMCButtonDef *> map;
+        const auto &buttons = buttonDefs();
+        for (const auto &button : buttons) {
+            std::visit([&](auto &&k) {
+                using T = std::decay_t<decltype(k)>;
+                if constexpr (std::is_same_v<T, FMCKey>) {
+                    map[k] = &button;
+                } else {
+                    for (const auto &key : k) {
+                        map[key] = &button;
+                    }
+                }
+            },
+                button.key);
+        }
+        it = cache.emplace(product->deviceVariant, std::move(map)).first;
+    }
+    return it->second;
+}
+
 const std::map<char, FMCTextColor> &RotateMD11FMCProfile::colorMap() const {
     static const std::map<char, FMCTextColor> colMap = {
         // Numeric style codes from datarefs
