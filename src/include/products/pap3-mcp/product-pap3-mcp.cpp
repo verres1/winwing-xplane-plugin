@@ -74,6 +74,10 @@ bool ProductPAP3MCP::connect() {
 }
 
 void ProductPAP3MCP::disconnect() {
+    // Turn off all LEDs
+    setLedBrightness(PAP3MCPLed::BACKLIGHT, 0);
+    setLedBrightness(PAP3MCPLed::LCD_BACKLIGHT, 0);
+    setLedBrightness(PAP3MCPLed::OVERALL_LED_BRIGHTNESS, 0);
     setLedBrightness(PAP3MCPLed::N1, 0);
     setLedBrightness(PAP3MCPLed::SPEED, 0);
     setLedBrightness(PAP3MCPLed::VNAV, 0);
@@ -91,13 +95,8 @@ void ProductPAP3MCP::disconnect() {
     setLedBrightness(PAP3MCPLed::AT_ARM, 0);
     setLedBrightness(PAP3MCPLed::MA_CAPT, 0);
     setLedBrightness(PAP3MCPLed::MA_FO, 0);
-    
-    initializeDisplays();
-    clearDisplays();
 
-    setLedBrightness(PAP3MCPLed::BACKLIGHT, 0);
-    setLedBrightness(PAP3MCPLed::LCD_BACKLIGHT, 0);
-    setLedBrightness(PAP3MCPLed::OVERALL_LED_BRIGHTNESS, 0);
+    clearDisplays();
 
     if (profile) {
         delete profile;
@@ -152,9 +151,13 @@ void ProductPAP3MCP::updateDisplays() {
         displayData.verticalSpeed != oldDisplayData.verticalSpeed ||
         displayData.verticalSpeedVisible != oldDisplayData.verticalSpeedVisible ||
         displayData.speedVisible != oldDisplayData.speedVisible ||
+        displayData.headingVisible != oldDisplayData.headingVisible ||
         displayData.crsCapt != oldDisplayData.crsCapt ||
         displayData.crsFo != oldDisplayData.crsFo ||
         displayData.showCourse != oldDisplayData.showCourse ||
+        displayData.showLabels != oldDisplayData.showLabels ||
+        displayData.showDashesWhenInactive != oldDisplayData.showDashesWhenInactive ||
+        displayData.showLabelsWhenInactive != oldDisplayData.showLabelsWhenInactive ||
         displayData.digitA != oldDisplayData.digitA ||
         displayData.digitB != oldDisplayData.digitB ||
         displayData.displayEnabled != oldDisplayData.displayEnabled ||
@@ -300,8 +303,8 @@ void ProductPAP3MCP::sendLCDDisplay(const std::string &speed, int heading, int a
             setFlag(payload, OFF_19, DOT_CPT_CRS, false);
         }
 
-        // HDG: 3 digits
-        {
+        // HDG: 3 digits - only draw if heading is visible
+        if (displayData.headingVisible) {
             int h, t, u;
             int hdg = std::clamp(heading, 0, 359);
             digits3(hdg, h, t, u);
@@ -388,8 +391,14 @@ void ProductPAP3MCP::sendLCDDisplay(const std::string &speed, int heading, int a
                     setFlag(payload, OFF_36, LBL_IAS, true);
                 }
             }
-            // Heading is always visible in the new architecture, no dashes needed
-
+            if (!displayData.headingVisible) {
+                drawHdgDashes(payload);
+                // Show HDG label even when inactive if configured
+                if (displayData.showLabelsWhenInactive) {
+                    setFlag(payload, OFF_36, LBL_HDG_L, true);
+                    setFlag(payload, OFF_32, LBL_HDG_R, true);
+                }
+            }
             if (!displayData.verticalSpeedVisible) {
                 drawVviDashes(payload);
                 // Show VS label even when inactive if configured
