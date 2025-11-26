@@ -5,11 +5,7 @@ lib/win_x64/
 build/
 dist/
 .cache/
-.vscode/
-.DS_Store/
 .idea/
-Winwing.xcodeproj/
-
 
 CMakeLists.txt.user
 CMakeCache.txt
@@ -24,8 +20,6 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
-build_platforms.sh
-
 
 ### C++ ###
 # Prerequisites
