@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <memory>
+#include <vector>
 #include <XPLMDisplay.h>
 #include <XPLMPlugin.h>
 #include <XPLMProcessing.h>
@@ -54,16 +56,63 @@ PLUGIN_API int XPluginStart(char *name, char *sig, char *desc) {
     PluginsMenu::getInstance()->addPersistentItem("Enable debug logging", [](int itemIndex) {
         bool debugLoggingEnabled = !PluginsMenu::getInstance()->isItemChecked(itemIndex);
 
-        PluginsMenu::getInstance()->setItemName(itemIndex, debugLoggingEnabled ? "Disable debug logging" : "Enable debug logging");
+        PluginsMenu::getInstance()->setItemName(itemIndex, debugLoggingEnabled ? "Debug logging enabled" : "Enable debug logging");
         PluginsMenu::getInstance()->setItemChecked(itemIndex, debugLoggingEnabled);
         AppState::getInstance()->debuggingEnabled = debugLoggingEnabled;
 
         if (debugLoggingEnabled) {
-            debug_force("Debug logging was enabled. Currently connected devices (%lu):\n", USBController::getInstance()->devices.size());
+            debug_force("Debug logging was enabled for plugin version %s. Currently connected devices (%lu):\n", VERSION, USBController::getInstance()->devices.size());
 
             for (auto &device : USBController::getInstance()->devices) {
                 debug_force("- (vendorId: 0x%04X, productId: 0x%04X, handler: %s) %s\n", device->vendorId, device->productId, device->classIdentifier(), device->productName.c_str());
             }
+
+            auto action = std::make_shared<std::function<void()>>();
+            *action = [action]() {
+                if (!AppState::getInstance()->debuggingEnabled) {
+                    return;
+                }
+
+                auto now = std::chrono::system_clock::now();
+                auto nowTimeT = std::chrono::system_clock::to_time_t(now);
+                auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+                std::tm localTime;
+#if IBM
+                localtime_s(&localTime, &nowTimeT);
+#else
+                localtime_r(&nowTimeT, &localTime);
+#endif
+
+                char timeBuffer[9];
+                strftime(timeBuffer, sizeof(timeBuffer), "%H:%M:%S", &localTime);
+
+                debug_force("[%s.%03lld] Write queue sizes:\n", timeBuffer, nowMs.count());
+                for (auto &device : USBController::getInstance()->devices) {
+                    debug_force("[%s.%03lld] - %s: %zu pending packets\n", timeBuffer, nowMs.count(), device->classIdentifier(), device->getWriteQueueSize());
+                }
+
+                // Report top dataref accesses
+                auto &stats = Dataref::getInstance()->getAccessStats();
+                if (!stats.empty()) {
+                    std::vector<std::pair<std::string, uint64_t>> sorted(stats.begin(), stats.end());
+                    std::sort(sorted.begin(), sorted.end(), [](const auto &a, const auto &b) {
+                        return a.second > b.second;
+                    });
+
+                    debug_force("[%s.%03lld] Top dataref accesses (last 5s):\n", timeBuffer, nowMs.count());
+                    size_t count = std::min(sorted.size(), size_t(10));
+                    for (size_t i = 0; i < count; i++) {
+                        debug_force("[%s.%03lld] - %s: %llu calls (%.1f/sec)\n",
+                            timeBuffer, nowMs.count(), sorted[i].first.c_str(), sorted[i].second, sorted[i].second / 5.0);
+                    }
+                    Dataref::getInstance()->resetAccessStats();
+                }
+
+                AppState::getInstance()->executeAfter(5000, *action);
+            };
+
+            (*action)();
         } else {
             debug_force("Debug logging was disabled.\n");
         }

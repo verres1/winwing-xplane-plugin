@@ -58,7 +58,7 @@ const char *ProductPAP3MCP::classIdentifier() {
 bool ProductPAP3MCP::connect() {
     if (USBDevice::connect()) {
         initializeDisplays();
-        
+
         setLedBrightness(PAP3MCPLed::BACKLIGHT, 0);
         setLedBrightness(PAP3MCPLed::LCD_BACKLIGHT, 0);
         setLedBrightness(PAP3MCPLed::OVERALL_LED_BRIGHTNESS, 0);
@@ -120,12 +120,12 @@ void ProductPAP3MCP::update() {
 
     if (++displayUpdateFrameCounter >= getDisplayUpdateFrameInterval()) {
         displayUpdateFrameCounter = 0;
-        updateDisplays();
+        updateDisplays(false);
     }
 }
 
-void ProductPAP3MCP::updateDisplays() {
-    bool shouldUpdate = false;
+void ProductPAP3MCP::updateDisplays(bool force) {
+    bool shouldUpdate = force;
     auto datarefManager = Dataref::getInstance();
     for (const std::string &dataref : profile->displayDatarefs()) {
         if (!lastUpdateCycle || datarefManager->getCachedLastUpdate(dataref.c_str()) > lastUpdateCycle) {
@@ -137,8 +137,6 @@ void ProductPAP3MCP::updateDisplays() {
     if (!shouldUpdate) {
         return;
     }
-
-    debug("PAP3MCP: Updating displays (lastUpdateCycle=%d)\n", lastUpdateCycle);
 
     // Save old display data for comparison
     PAP3MCPDisplayData oldDisplayData = displayData;
@@ -172,8 +170,6 @@ void ProductPAP3MCP::updateDisplays() {
 }
 
 void ProductPAP3MCP::initializeDisplays() {
-    debug("PAP3MCP: Initializing displays\n");
-
     // Send LCD initialization command (opcode 0x12)
     // Structure from working code:
     // - Bytes 0-3: Header [F0 00 SEQ 12]
@@ -185,7 +181,7 @@ void ProductPAP3MCP::initializeDisplays() {
     // Header
     initCmd[0] = 0xF0;
     initCmd[1] = 0x00;
-    initCmd[2] = (packetNumber == 0) ? 1 : packetNumber;
+    initCmd[2] = packetNumber;
     initCmd[3] = 0x12; // Init opcode
 
     // Init tail (starts at offset 4)
@@ -211,9 +207,7 @@ void ProductPAP3MCP::initializeDisplays() {
     initCmd[23] = 0x00;
 
     writeData(initCmd);
-
-    packetNumber++;
-    if (packetNumber == 0) {
+    if (++packetNumber == 0) {
         packetNumber = 1;
     }
 }
@@ -422,7 +416,7 @@ void ProductPAP3MCP::sendLCDDisplay(const std::string &speed, int heading, int a
     // Header (4 bytes at offset 0-3)
     data.push_back(0xF0);
     data.push_back(0x00);
-    data.push_back(packetNumber == 0 ? 1 : packetNumber);
+    data.push_back(packetNumber);
     data.push_back(0x38); // Opcode for LCD payload
 
     // Preamble (14 bytes at offset 4-17)
@@ -455,14 +449,12 @@ void ProductPAP3MCP::sendLCDDisplay(const std::string &speed, int heading, int a
     }
 
     writeData(data);
+    if (++packetNumber == 0) {
+        packetNumber = 1;
+    }
 
     // Send two empty frames (opcode 0x38 with no payload)
     for (int i = 0; i < 2; i++) {
-        packetNumber++;
-        if (packetNumber == 0) {
-            packetNumber = 1;
-        }
-
         std::vector<uint8_t> emptyFrame(64, 0x00);
         emptyFrame[0] = 0xF0;
         emptyFrame[1] = 0x00;
@@ -470,14 +462,12 @@ void ProductPAP3MCP::sendLCDDisplay(const std::string &speed, int heading, int a
         emptyFrame[3] = 0x38; // Same opcode
 
         writeData(emptyFrame);
+        if (++packetNumber == 0) {
+            packetNumber = 1;
+        }
     }
 
     // Send commit frame (opcode 0x2A)
-    packetNumber++;
-    if (packetNumber == 0) {
-        packetNumber = 1;
-    }
-
     std::vector<uint8_t> commitFrame(64, 0x00);
     commitFrame[0] = 0xF0;
     commitFrame[1] = 0x00;
@@ -494,9 +484,7 @@ void ProductPAP3MCP::sendLCDDisplay(const std::string &speed, int heading, int a
     commitFrame[0x27] = 0x50;
 
     writeData(commitFrame);
-
-    packetNumber++;
-    if (packetNumber == 0) {
+    if (++packetNumber == 0) {
         packetNumber = 1;
     }
 }
@@ -528,10 +516,6 @@ void ProductPAP3MCP::setLedBrightness(PAP3MCPLed led, uint8_t brightness) {
     if (ledValue >= 3) {
         // Individual LED - convert brightness to binary on/off
         data[8] = (brightness > 0) ? 0x01 : 0x00;
-        debug("PAP3MCP: Setting LED %d to %s\n", ledValue, (brightness > 0) ? "ON" : "OFF");
-    } else {
-        // Dimming channel - use full brightness value
-        debug("PAP3MCP: Setting dimming channel %d to brightness %d\n", ledValue, brightness);
     }
 
     writeData(data);
