@@ -1,5 +1,5 @@
-#ifndef TOLISS_FCU_EFIS_PROFILE_H
-#define TOLISS_FCU_EFIS_PROFILE_H
+#ifndef FF767_FCU_EFIS_PROFILE_H
+#define FF767_FCU_EFIS_PROFILE_H
 
 #include "fcu-efis-aircraft-profile.h"
 
@@ -7,17 +7,18 @@
 #include <string>
 #include <vector>
 
-class TolissFCUEfisProfile : public FCUEfisAircraftProfile {
+class FF767FCUEfisProfile : public FCUEfisAircraftProfile {
     private:
-        bool isAnnunTest(bool allowEssentialBusPowerOnly = false);
+        bool isTestMode();
+        bool isStdCaptain;
+        bool isStdFirstOfficer;
 
     public:
-        TolissFCUEfisProfile(ProductFCUEfis *product);
-        ~TolissFCUEfisProfile();
+        FF767FCUEfisProfile(ProductFCUEfis *product);
+        ~FF767FCUEfisProfile();
 
         static bool IsEligible();
 
-        // Override base class methods
         const std::vector<std::string> &displayDatarefs() const override;
         const std::unordered_map<uint16_t, FCUEfisButtonDef> &buttonDefs() const override;
         void updateDisplayData(FCUDisplayData &data) override;
@@ -30,7 +31,7 @@ class TolissFCUEfisProfile : public FCUEfisAircraftProfile {
             return true;
         }
 
-        void buttonPressed(const FCUEfisButtonDef *button, XPLMCommandPhase phase) override;
+        void buttonPressed(const FCUEfisButtonDef *button, XPLMCommandPhase phase) override;        
 };
 
 #endif

@@ -285,9 +285,9 @@ void ProductFMC::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, ui
     }
 }
 
-void ProductFMC::updatePage() {
+void ProductFMC::updatePage(bool forceUpdate) {
     auto datarefManager = Dataref::getInstance();
-    bool shouldUpdate = false;
+    bool shouldUpdate = forceUpdate;
 
     for (const std::string &dataref : profile->displayDatarefs()) {
         if (!lastUpdateCycle || datarefManager->getCachedLastUpdate(dataref.c_str()) > lastUpdateCycle) {
@@ -371,6 +371,8 @@ void ProductFMC::writeLineToPage(std::vector<std::vector<char>> &page, int line,
 }
 
 void ProductFMC::clearDisplay() {
+    page = std::vector<std::vector<char>>(ProductFMC::PageLines, std::vector<char>(ProductFMC::PageBytesPerLine, ' '));
+    
     std::vector<uint8_t> blankLine = {};
     blankLine.push_back(0xf2);
     for (int i = 0; i < ProductFMC::PageCharsPerLine; ++i) {
