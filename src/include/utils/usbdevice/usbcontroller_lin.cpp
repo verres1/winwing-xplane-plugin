@@ -22,6 +22,7 @@
 
 USBController *USBController::instance = nullptr;
 static std::atomic<bool> shouldStopMonitoring{false};
+static std::thread monitoringThread;
 
 USBController::USBController() {
     struct udev *udev = udev_new();
@@ -39,10 +40,9 @@ USBController::USBController() {
     udev_monitor_enable_receiving(hidManager);
 
     shouldStopMonitoring = false;
-    std::thread monitorThread([this]() {
+    monitoringThread = std::thread([this]() {
         monitorDevices();
     });
-    monitorThread.detach();
 }
 
 USBController::~USBController() {
@@ -59,8 +59,9 @@ USBController *USBController::getInstance() {
 void USBController::destroy() {
     shouldStopMonitoring = true;
 
-    // Give the monitoring thread time to exit gracefully
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (monitoringThread.joinable()) {
+        monitoringThread.join();
+    }
 
     for (auto ptr : devices) {
         delete ptr;
@@ -176,7 +177,6 @@ void USBController::monitorDevices() {
             }
         }
     }
-    debug("Monitoring thread is exiting\n");
 }
 
 void USBController::DeviceAddedCallback(void *context, struct udev_device *device) {

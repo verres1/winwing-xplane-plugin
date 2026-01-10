@@ -31,27 +31,22 @@ bool USBDevice::connect() {
     inputBuffer = new uint8_t[kInputReportSize];
 
     connected = true;
-    std::thread inputThread([this]() {
+    inputThreadRunning = true;
+    inputThread = std::thread([this]() {
         uint8_t buffer[65];
-        while (connected && hidDevice >= 0) {
+        while (inputThreadRunning && connected && hidDevice >= 0) {
             ssize_t bytesRead = read(hidDevice, buffer, sizeof(buffer));
-            if (bytesRead > 0 && connected) {
+            if (bytesRead > 0 && inputThreadRunning && connected) {
                 InputReportCallback(this, (int) bytesRead, buffer);
             } else if (bytesRead < 0) {
-                // Device error or disconnected
-                debug_force("Read failed with error: %d\n", errno);
                 break;
             } else if (bytesRead == 0) {
-                // EOF - device disconnected
                 break;
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-
-        debug("Input thread exiting\n");
     });
-    inputThread.detach();
 
     writeThreadRunning = true;
     writeThread = std::thread(&USBDevice::writeThreadLoop, this);
@@ -87,21 +82,26 @@ void USBDevice::update() {
 }
 
 void USBDevice::disconnect() {
-    // Wait for write queue to drain before disconnecting
     while (writeQueueSize.load() > 0 && writeThreadRunning) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     connected = false;
+    inputThreadRunning = false;
     writeThreadRunning = false;
     writeQueueCV.notify_all();
-    if (writeThread.joinable()) {
-        writeThread.join();
-    }
 
     if (hidDevice >= 0) {
         close(hidDevice);
         hidDevice = -1;
+    }
+
+    if (inputThread.joinable()) {
+        inputThread.join();
+    }
+
+    if (writeThread.joinable()) {
+        writeThread.join();
     }
 
     if (inputBuffer) {

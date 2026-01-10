@@ -44,6 +44,11 @@ class USBDevice {
         std::atomic<bool> writeThreadRunning{false};
         std::atomic<size_t> writeQueueSize{0};
 
+#if LIN || IBM
+        std::thread inputThread;
+        std::atomic<bool> inputThreadRunning{false};
+#endif
+
         void processQueuedEvents();
         void writeThreadLoop();
 

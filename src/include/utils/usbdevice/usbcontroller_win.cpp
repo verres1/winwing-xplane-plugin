@@ -22,11 +22,12 @@ USBController *USBController::instance = nullptr;
 
 static std::map<USBDevice *, std::string> devicePaths;
 static std::set<std::pair<uint16_t, uint16_t>> pendingDevices;
+static std::thread monitoringThread;
 
 USBController::USBController() {
     enumerateDevices();
 
-    std::thread monitorThread([this]() {
+    monitoringThread = std::thread([this]() {
         while (!shouldShutdown) {
             std::this_thread::sleep_for(std::chrono::seconds(5));
             if (!shouldShutdown) {
@@ -34,7 +35,6 @@ USBController::USBController() {
             }
         }
     });
-    monitorThread.detach();
 }
 
 USBController::~USBController() {
@@ -51,7 +51,9 @@ USBController *USBController::getInstance() {
 void USBController::destroy() {
     shouldShutdown = true;
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (monitoringThread.joinable()) {
+        monitoringThread.join();
+    }
 
     for (auto ptr : devices) {
         devicePaths.erase(ptr);
