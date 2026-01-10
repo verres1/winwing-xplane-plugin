@@ -34,18 +34,19 @@ For linux, see the [Linux udev rules](#linux-udev-rules) section below to ensure
 
 The matrix below shows device and aircraft compatibility. Devices are listed vertically, aircraft horizontally.
 
-| Device                      | Toliss A3xx | Laminar A330 | Laminar 737 | AeroGenesis A330 | Zibo 737 | IXEG 737 | FF 767/777 | SSG 747 |
-| --------------------------- | ----------- | ------------ | ----------- | ---------------- | -------- | -------- | ---------- | ------- |
-| **URSA MINOR Joystick L+R** | 🟢          | 🟢           | 🔴          | 🟢               | 🟢       | 🟢       | 🟢         | 🟢      |
-| **URSA MINOR Throttle**     | 🟢          | 🔴           | 🔴          | 🔴               | 🔴       | 🔴       | 🔴         | 🔴      |
-| **MCDU-32**                 | 🟢          | 🟢           | 🔴          | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      |
-| **PFP 3N**                  | 🟢          | 🟢           | 🔴          | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      |
-| **PFP 4**                   | 🟢          | 🟢           | 🔴          | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      |
-| **PFP 7**                   | 🟢          | 🟢           | 🔴          | 🟢               | 🟢       | 🟢       | 🟢         | 🟠      |
-| **PAP3 / PAP3 Mag**         | 🔴          | 🔴           | 🔴          | 🔴               | 🟢       | 🔴       | 🔴         | 🔴      |
-| **FCU and EFIS L+R**        | 🟢          | 🟢           | 🟠          | 🔴               | 🔴       | 🔴       | 🟢         | 🔴      |
-| **ECAM32**                  | 🟢          | 🔴           | 🔴          | 🔴               | 🔴       | 🔴       | 🔴         | 🔴      |
-| **AGP**                     | 🟢          | 🔴           | 🔴          | 🔴               | 🔴       | 🔴       | 🔴         | 🔴      |
+| Device                      | Toliss A3xx | Laminar A330 | Laminar 737 | AeroGenesis A330 | Zibo / LevelUp 737 | IXEG 737 | FlightFactor 767/777 | FlightFactor A350 V1 | SSG 747 |
+| --------------------------- | ----------- | ------------ | ----------- | ---------------- | ------------------ | -------- | -------------------- | -------------------- | ------- |
+| **URSA MINOR Joystick L+R** | 🟢          | 🟢           | 🔴          | 🟢               | 🟢                 | 🟢       | 🟢                   | 🔴                   | 🟢      |
+| **URSA MINOR Throttle**     | 🟢          | 🔴           | 🔴          | 🔴               | 🔴                 | 🔴       | 🔴                   | 🔴                   | 🔴      |
+| **MCDU-32**                 | 🟢          | 🟢           | 🔴          | 🟢               | 🟢                 | 🟢       | 🟢                   | 🔴                   | 🟠      |
+| **PFP 3N**                  | 🟢          | 🟢           | 🔴          | 🟢               | 🟢                 | 🟢       | 🟢                   | 🔴                   | 🟠      |
+| **PFP 4**                   | 🟢          | 🟢           | 🔴          | 🟢               | 🟢                 | 🟢       | 🟢                   | 🔴                   | 🟠      |
+| **PFP 7**                   | 🟢          | 🟢           | 🔴          | 🟢               | 🟢                 | 🟢       | 🟢                   | 🔴                   | 🟠      |
+| **PAP3 / PAP3 Mag**         | 🔴          | 🔴           | 🔴          | 🔴               | 🟢                 | 🔴       | 🟢                   | 🔴                   | 🔴      |
+| **FCU and EFIS L+R**        | 🟢          | 🟢           | 🟠          | 🔴               | 🔴                 | 🔴       | 🟢                   | 🟢                   | 🔴      |
+| **ECAM32**                  | 🟢          | 🔴           | 🔴          | 🔴               | 🔴                 | 🔴       | 🔴                   | 🔴                   | 🔴      |
+| **AGP**                     | 🟢          | 🔴           | 🔴          | 🔴               | 🔴                 | 🔴       | 🔴                   | 🔴                   | 🔴      |
+| **3N / 3M PDC**             | 🔴          | 🔴           | 🔴          | 🔴               | 🟢                 | 🔴       | 🟢                   | 🔴                   | 🔴      |
 
 #### Legend
 
@@ -70,9 +71,9 @@ The matrix below shows device and aircraft compatibility. Devices are listed ver
 - [@ColinM9991](https://github.com/ColinM9991) for the FF777 profile.
 - [@tukan68](https://github.com/tukan68) for FF767 profile.
 - [@verres1](https://github.com/verres1) for enriching the FF777 profile.
-- [@teropa] (https://forums.x-plane.org/profile/1028374-teropa/) for data capture and testing of multiple devices.
-- [@SoarByWire] (https://forums.x-plane.org/profile/411164-soarbywire/) for the testing of multiple devices.
-- [@MortyMars] (https://github.com/MortyMars) for the FCU/EFIS FF777 and FF767 profile.
+- [@teropa](https://forums.x-plane.org/profile/1028374-teropa/) for data capture and testing of multiple devices.
+- [@SoarByWire](https://forums.x-plane.org/profile/411164-soarbywire/) for the testing of multiple devices.
+- [@MortyMars](https://github.com/MortyMars) for the FCU/EFIS FF777 and FF767 profile.
 
 ### Linux udev rules
 
@@ -98,14 +99,18 @@ KERNEL=="hidraw*", ATTRS{idProduct}=="bb37", ATTRS{idVendor}=="4098", MODE="0666
 KERNEL=="hidraw*", ATTRS{idProduct}=="bb3f", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp7-fo"
 KERNEL=="hidraw*", ATTRS{idProduct}=="bb3b", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp7-obs"
 KERNEL=="hidraw*", ATTRS{idProduct}=="bb10", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bc1e", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu-efis_r"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bc1d", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu-efis_l"
-KERNEL=="hidraw*", ATTRS{idProduct}=="ba01", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu-efis_lr"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bc1e", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu-efis-r"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bc1d", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu-efis-l"
+KERNEL=="hidraw*", ATTRS{idProduct}=="ba01", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu-efis-lr"
 KERNEL=="hidraw*", ATTRS{idProduct}=="bf0f", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pap3"
 KERNEL=="hidraw*", ATTRS{idProduct}=="bb70", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-ecam32"
 KERNEL=="hidraw*", ATTRS{idProduct}=="bb80", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-agp"
 KERNEL=="hidraw*", ATTRS{idProduct}=="b920", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-throttle-l"
 KERNEL=="hidraw*", ATTRS{idProduct}=="b930", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-throttle-r"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb61", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-3n-pdc-l"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb62", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-3n-pdc-r"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb51", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-3m-pdc-l"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb52", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-3m-pdc-r"
 ```
 
 ### Demonstration
