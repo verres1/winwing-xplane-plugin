@@ -1,6 +1,6 @@
 //
 //  DeviceModel.swift
-//  WinwingDesktop
+//  WinctrlDesktop
 //
 //  Created by Ramon Swilem on 08/07/2025.
 //
@@ -62,8 +62,8 @@ func c_fmc_setLedBrightness(_ handle: UnsafeRawPointer, _ ledId: Int32, _ bright
 func c_fmc_writeData(_ handle: UnsafeRawPointer, _ data: UnsafePointer<UInt8>, _ length: Int32) -> Bool
 @_silgen_name("fmc_setFont")
 func c_fmc_setFont(_ handle: UnsafeRawPointer, _ fontType: Int32) -> Void
-@_silgen_name("fmc_setFontUpdatingEnabled")
-func c_fmc_setFontUpdatingEnabled(_ handle: UnsafeRawPointer, _ enabled: Bool) -> Void
+@_silgen_name("fmc_setScreenLayout")
+func c_fmc_setScreenLayout(_ handle: UnsafeRawPointer, _ fontType: Int32, _ characterHeight: Int32, _ characterWidth: Int32, _ x: Int32, _ y: Int32) -> Void
 
 // FCU-EFIS functions via handle
 @_silgen_name("fcuefis_clear")
@@ -90,7 +90,7 @@ enum DeviceType: String, CaseIterable {
     case unknown = "unknown"
 }
 
-struct WinwingDevice: Identifiable, Equatable, Hashable {
+struct WinctrlDevice: Identifiable, Equatable, Hashable {
     let id: Int
     let name: String
     let type: DeviceType
@@ -117,7 +117,7 @@ struct WinwingDevice: Identifiable, Equatable, Hashable {
         self.fcuEfisHandle = c_getFCUEfisHandle(Int32(id))
     }
     
-    static func == (lhs: WinwingDevice, rhs: WinwingDevice) -> Bool {
+    static func == (lhs: WinctrlDevice, rhs: WinctrlDevice) -> Bool {
         return lhs.id == rhs.id && 
                lhs.name == rhs.name && 
                lhs.type == rhs.type && 
@@ -154,7 +154,7 @@ struct WinwingDevice: Identifiable, Equatable, Hashable {
         guard let handle = deviceHandle else { return }
         c_device_force_state_sync(handle)
     }
-    
+
     // Joystick wrapper methods
     var joystick: JoystickWrapper? {
         guard let handle = joystickHandle else { return nil }
@@ -286,9 +286,6 @@ struct FMCWrapper {
         case b737 = 2
         case xcrafts = 3
         case vga1 = 4
-        case vga2 = 5
-        case vga3 = 6
-        case vga4 = 7
         
         
         var displayName: String {
@@ -298,9 +295,6 @@ struct FMCWrapper {
             case .b737: return "737"
             case .xcrafts: return "X-Crafts E-Jet"
             case .vga1: return "VGA 1"
-            case .vga2: return "VGA 2"
-            case .vga3: return "VGA 3"
-            case .vga4: return "VGA 4"
             }
         }
     }
@@ -309,10 +303,13 @@ struct FMCWrapper {
     func setFont(_ fontType: FontType) {
         c_fmc_setFont(handle, Int32(fontType.rawValue))
     }
-    
-    // Enable or disable font updating
-    func setFontUpdatingEnabled(_ enabled: Bool) {
-        c_fmc_setFontUpdatingEnabled(handle, enabled)
+
+    // Apply the SimAppPro "Screen Layout Settings" as one unit: Character Size
+    // (width x height of each character) plus Screen Position (top-left x/y). Used for
+    // PFP devices so 14 display rows line up with the physical LSK keys. Defaults are
+    // the MCDU spec (character 23 x 29, position 16/17).
+    func setScreenLayout(_ fontType: FontType, characterHeight: Int = 29, characterWidth: Int = 23, x: Int = 16, y: Int = 17) {
+        c_fmc_setScreenLayout(handle, Int32(fontType.rawValue), Int32(characterHeight), Int32(characterWidth), Int32(x), Int32(y))
     }
 }
 
@@ -439,17 +436,17 @@ struct FCUEfisWrapper {
 
 @MainActor
 class DeviceManager: ObservableObject {
-    @Published var devices: [WinwingDevice] = []
+    @Published var devices: [WinctrlDevice] = []
     @Published var selectedDeviceId: Int?
     
-    var selectedDevice: WinwingDevice? {
+    var selectedDevice: WinctrlDevice? {
         guard let id = selectedDeviceId else { return nil }
         return devices.first { $0.id == id }
     }
     
     func refreshDevices() {
         let count = Int(c_getDeviceCount())
-        var newDevices: [WinwingDevice] = []
+        var newDevices: [WinctrlDevice] = []
         
         for i in 0..<count {
             guard let namePtr = c_getDeviceName(Int32(i)),
@@ -463,7 +460,7 @@ class DeviceManager: ObservableObject {
             let productId = c_getDeviceProductId(Int32(i))
             let isConnected = c_isDeviceConnected(Int32(i))
             
-            let device = WinwingDevice(
+            let device = WinctrlDevice(
                 id: i,
                 name: name,
                 type: type,
@@ -492,7 +489,7 @@ class DeviceManager: ObservableObject {
         }
     }
     
-    func selectDevice(_ device: WinwingDevice) {
+    func selectDevice(_ device: WinctrlDevice) {
         selectedDeviceId = device.id
     }
 }

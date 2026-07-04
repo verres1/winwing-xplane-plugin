@@ -2,7 +2,6 @@
 
 #include "appstate.h"
 #include "dataref.h"
-#include "font.h"
 #include "product-fmc.h"
 
 #include <algorithm>
@@ -10,57 +9,53 @@
 #include <cmath>
 #include <cstring>
 
-ZiboFMCProfile::ZiboFMCProfile(ProductFMC *product) :
-    FMCAircraftProfile(product) {
+ZiboFMCProfile::ZiboFMCProfile(ProductFMC *product) : FMCAircraftProfile(product) {
     datarefRegex = std::regex("laminar/B738/fmc[0-9]+/Line([0-9]{2})_([A-Z]+)");
 
     product->setAllLedsEnabled(false);
-    product->setFont(Font::GlyphData(FontVariant::Font737, product->identifierByte));
+    product->setFont(FontVariant::Font737);
 
-    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("laminar/B738/electric/instrument_brightness", [product](std::vector<float> screenBrightness) {
+    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("laminar/B738/electric/instrument_brightness", [product](const std::vector<float> &screenBrightness) {
         if (screenBrightness.size() < 11) {
             return;
         }
 
         uint8_t target = Dataref::getInstance()->get<bool>("sim/cockpit/electrical/avionics_on") ? screenBrightness[product->deviceVariant == FMCDeviceVariant::VARIANT_CAPTAIN ? 10 : 11] * 255 : 0;
         product->setLedBrightness(FMCLed::SCREEN_BACKLIGHT, target);
-    });
+    },
+        this);
 
-    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("laminar/B738/electric/panel_brightness", [product](std::vector<float> panelBrightness) {
+    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("laminar/B738/electric/panel_brightness", [product](const std::vector<float> &panelBrightness) {
         if (panelBrightness.size() < 4) {
             return;
         }
 
         uint8_t target = Dataref::getInstance()->get<bool>("sim/cockpit/electrical/avionics_on") ? panelBrightness[3] * 255 : 0;
         product->setLedBrightness(FMCLed::BACKLIGHT, target);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("sim/cockpit/electrical/avionics_on", [](bool poweredOn) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("laminar/B738/electric/panel_brightness");
         Dataref::getInstance()->executeChangedCallbacksForDataref("laminar/B738/electric/instrument_brightness");
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("laminar/B738/fmc/fmc_message", [product](bool enabled) {
         product->setLedBrightness(FMCLed::PFP_MSG, enabled ? 1 : 0);
         product->setLedBrightness(FMCLed::MCDU_MCDU, enabled ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("laminar/B738/indicators/fmc_exec_lights", [product](bool enabled) {
         product->setLedBrightness(FMCLed::PFP_EXEC, enabled ? 1 : 0);
-        product->setLedBrightness(FMCLed::MCDU_RDY, enabled ? 1 : 0);
-    });
-}
-
-ZiboFMCProfile::~ZiboFMCProfile() {
-    Dataref::getInstance()->unbind("laminar/B738/electric/instrument_brightness");
-    Dataref::getInstance()->unbind("laminar/B738/electric/panel_brightness");
-    Dataref::getInstance()->unbind("sim/cockpit/electrical/avionics_on");
-    Dataref::getInstance()->unbind("laminar/B738/fmc/fmc_message");
-    Dataref::getInstance()->unbind("laminar/B738/indicators/fmc_exec_lights");
+        product->setLedBrightness(FMCLed::MCDU_STATUS, enabled ? 1 : 0);
+    },
+        this);
 }
 
 bool ZiboFMCProfile::IsEligible() {
-    return Dataref::getInstance()->exists("laminar/B738/electric/instrument_brightness");
+    return Dataref::getInstance()->exists("zibomod/Aircraft_Path");
 }
 
 const std::vector<std::string> &ZiboFMCProfile::displayDatarefs() const {
@@ -157,18 +152,24 @@ const std::vector<FMCButtonDef> &ZiboFMCProfile::buttonDefs() const {
                         {std::vector<FMCKey>{FMCKey::PFP_INIT_REF, FMCKey::MCDU_INIT}, "laminar/B738/button/" + fmc + "_init_ref"},
                         {std::vector<FMCKey>{FMCKey::PFP_ROUTE, FMCKey::MCDU_SEC_FPLN}, "laminar/B738/button/" + fmc + "_rte"},
                         {FMCKey::PFP3_CLB, "laminar/B738/button/" + fmc + "_clb"},
-                        {FMCKey::PFP3_CRZ, "laminar/B738/button/" + fmc + "_crz"},
+                        {std::vector<FMCKey>{FMCKey::PFP3_CRZ, FMCKey::PFP4_ATC, FMCKey::PFP7_ALTN}, "laminar/B738/button/" + fmc + "_crz"},
                         {FMCKey::PFP3_DES, "laminar/B738/button/" + fmc + "_des"},
-                        {FMCKey::BRIGHTNESS_DOWN, "laminar/B738/electric/instrument_brightness[10]", -0.1},
-                        {FMCKey::BRIGHTNESS_UP, "laminar/B738/electric/instrument_brightness[10]", 0.1},
+                        {FMCKey::BRIGHTNESS_DOWN, "laminar/B738/electric/instrument_brightness[10]", FMCDatarefType::ADJUST_VALUE, -0.1},
+                        {FMCKey::BRIGHTNESS_UP, "laminar/B738/electric/instrument_brightness[10]", FMCDatarefType::ADJUST_VALUE, 0.1},
                         {FMCKey::MENU, "laminar/B738/button/" + fmc + "_menu"},
                         {std::vector<FMCKey>{FMCKey::PFP_LEGS, FMCKey::MCDU_FPLN, FMCKey::MCDU_DIR}, "laminar/B738/button/" + fmc + "_legs"},
+                        {FMCKey::PFP4_VNAV, "laminar/B738/button/" + fmc + "_legs"},
+                        {FMCKey::PFP7_VNAV, "laminar/B738/button/" + fmc + "_legs"},
                         {std::vector<FMCKey>{FMCKey::PFP_DEP_ARR, FMCKey::MCDU_AIRPORT}, "laminar/B738/button/" + fmc + "_dep_app"},
                         {FMCKey::PFP_HOLD, "laminar/B738/button/" + fmc + "_hold"},
+                        {FMCKey::PFP4_FMC_COMM, "laminar/B738/button/" + fmc + "_hold"},
+                        {FMCKey::PFP7_FMC_COMM, "laminar/B738/button/" + fmc + "_hold"},
                         {FMCKey::PROG, "laminar/B738/button/" + fmc + "_prog"},
                         {std::vector<FMCKey>{FMCKey::PFP_EXEC, FMCKey::MCDU_EMPTY_TOP_RIGHT}, "laminar/B738/button/" + fmc + "_exec"},
                         {std::vector<FMCKey>{FMCKey::PFP3_N1_LIMIT, FMCKey::MCDU_PERF}, "laminar/B738/button/" + fmc + "_n1_lim"},
                         {std::vector<FMCKey>{FMCKey::PFP_FIX, FMCKey::MCDU_EMPTY_BOTTOM_LEFT}, "laminar/B738/button/" + fmc + "_fix"},
+                        {FMCKey::PFP4_NAV_RAD, "laminar/B738/button/" + fmc + "_fix"},
+                        {FMCKey::PFP7_NAV_RAD, "laminar/B738/button/" + fmc + "_fix"},
                         {FMCKey::PAGE_PREV, "laminar/B738/button/" + fmc + "_prev_page"},
                         {FMCKey::PAGE_NEXT, "laminar/B738/button/" + fmc + "_next_page"},
                         {FMCKey::KEY1, "laminar/B738/button/" + fmc + "_1"},
@@ -249,8 +250,8 @@ const std::map<char, FMCTextColor> &ZiboFMCProfile::colorMap() const {
         {'M', FMCTextColor::COLOR_MAGENTA},
         {'G', FMCTextColor::COLOR_GREEN},
         {'C', FMCTextColor::COLOR_CYAN},
-        {'I', FMCTextColor::COLOR_WHITE_BG}, // White (should be inverted gray/white)
-        {'X', FMCTextColor::COLOR_WHITE},    // White (should be special labels)
+        {'I', FMCTextColor::withBackgroundColor(FMCTextColor::COLOR_WHITE, FMCTextColor::COLOR_GREY)}, // White (should be inverted gray/white)
+        {'X', FMCTextColor::COLOR_WHITE},                                                              // White (should be special labels)
     };
 
     return colMap;
@@ -334,11 +335,19 @@ void ZiboFMCProfile::updatePage(std::vector<std::vector<char>> &page) {
 }
 
 void ZiboFMCProfile::buttonPressed(const FMCButtonDef *button, XPLMCommandPhase phase) {
-    if (std::fabs(button->value) > std::numeric_limits<double>::epsilon()) {
-        if (phase != xplm_CommandBegin) {
+    if (!button || button->dataref.empty() || phase == xplm_CommandContinue) {
+        return;
+    }
+
+    auto datarefManager = Dataref::getInstance();
+    if (button->datarefType == FMCDatarefType::SET_VALUE || button->datarefType == FMCDatarefType::SET_VALUE_PHASED) {
+        double value = std::fabs(button->value) < std::numeric_limits<double>::epsilon() ? 1.0 : button->value;
+        if (button->datarefType == FMCDatarefType::SET_VALUE && phase != xplm_CommandBegin) {
             return;
         }
 
+        datarefManager->set<double>(button->dataref.c_str(), phase == xplm_CommandBegin ? value : 0.0);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::ADJUST_VALUE) {
         std::string ref = button->dataref;
         size_t start = ref.find('[');
         if (start != std::string::npos) {
@@ -346,15 +355,85 @@ void ZiboFMCProfile::buttonPressed(const FMCButtonDef *button, XPLMCommandPhase 
             int index = std::stoi(ref.substr(start + 1, end - start - 1));
             std::string baseRef = ref.substr(0, start);
 
-            auto vec = Dataref::getInstance()->get<std::vector<float>>(baseRef.c_str());
+            auto vec = datarefManager->get<std::vector<float>>(baseRef.c_str());
             if (index >= 0 && index < (int) vec.size()) {
                 vec[index] = std::clamp(vec[index] + button->value, 0.0, 1.0);
-                Dataref::getInstance()->set<std::vector<float>>(baseRef.c_str(), vec);
+                datarefManager->set<std::vector<float>>(baseRef.c_str(), vec);
             }
         } else {
-            Dataref::getInstance()->set<float>(ref.c_str(), button->value);
+            double currentValue = datarefManager->get<double>(button->dataref.c_str());
+            datarefManager->set<double>(button->dataref.c_str(), currentValue + button->value);
+        }
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_MULTIPLE_CMD_ONCE) {
+        std::stringstream ss(button->dataref);
+        std::string item;
+        std::vector<std::string> commands;
+        while (std::getline(ss, item, ',')) {
+            commands.push_back(item);
+        }
+
+        for (const auto &cmd : commands) {
+            datarefManager->executeCommand(cmd.c_str());
         }
     } else {
-        Dataref::getInstance()->executeCommand(button->dataref.c_str(), phase);
+        if (Dataref::getInstance()->get<int>("laminar/B738/fmc_type") == 1) {
+            std::vector<std::pair<FMCKey, FMCKey>> fansMapping = {
+                {FMCKey::PFP_DEP_ARR, FMCKey::PFP3_CLB},
+                {FMCKey::PFP4_ATC, FMCKey::PFP3_CRZ},
+                {FMCKey::PFP4_VNAV, FMCKey::PFP3_DES},
+                {FMCKey::PFP7_VNAV, FMCKey::PFP3_DES},
+                {FMCKey::PFP_FIX, FMCKey::MENU},
+                {FMCKey::PFP_HOLD, FMCKey::PFP_DEP_ARR},
+                {FMCKey::PFP4_FMC_COMM, FMCKey::PFP_HOLD},
+                {FMCKey::PFP7_FMC_COMM, FMCKey::PFP_HOLD},
+                {FMCKey::MENU, FMCKey::PFP3_N1_LIMIT},
+                {FMCKey::PFP3_N1_LIMIT, FMCKey::PFP_FIX},
+            };
+
+            FMCKey pressedKey = FMCKey::INVALID_UNKNOWN;
+            if (button->key.index() == 0) {
+                pressedKey = std::get<FMCKey>(button->key);
+            } else {
+                const auto &keys = std::get<std::vector<FMCKey>>(button->key);
+                for (const auto &k : keys) {
+                    for (const auto &m : fansMapping) {
+                        if (k == m.first) {
+                            pressedKey = k;
+                            break;
+                        }
+                    }
+                    if (pressedKey != FMCKey::INVALID_UNKNOWN) {
+                        break;
+                    }
+                }
+                if (pressedKey == FMCKey::INVALID_UNKNOWN) {
+                    pressedKey = keys[0];
+                }
+            }
+
+            for (const auto &mapping : fansMapping) {
+                if (pressedKey == mapping.first) {
+                    // Find the mapped button
+                    auto it = buttonKeyMap().find(mapping.second);
+                    if (it != buttonKeyMap().end()) {
+                        if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_CMD_ONCE) {
+                            // Default phase -1 maps to XPLMCommandOnce; passing
+                            // xplm_CommandBegin would issue an XPLMCommandBegin
+                            // that is never balanced with an End.
+                            datarefManager->executeCommand(it->second->dataref.c_str());
+                        } else if (button->datarefType == FMCDatarefType::EXECUTE_CMD_PHASED) {
+                            datarefManager->executeCommand(it->second->dataref.c_str(), phase);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_CMD_ONCE) {
+            datarefManager->executeCommand(button->dataref.c_str());
+        } else if (button->datarefType == FMCDatarefType::EXECUTE_CMD_PHASED) {
+            datarefManager->executeCommand(button->dataref.c_str(), phase);
+        }
     }
 }

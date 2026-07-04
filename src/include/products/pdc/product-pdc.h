@@ -28,8 +28,10 @@ class ProductPDC : public USBDevice {
         const PDCDeviceVariant deviceVariant;
 
         const char *classIdentifier() override;
+        const char *activeProfileName() const override;
         bool connect() override;
-        void disconnect() override;
+        void update() override;
+        void blackout() override;
         void didReceiveData(int reportId, uint8_t *report, int reportLength) override;
         void didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count = 1) override;
 

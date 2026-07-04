@@ -1,6 +1,7 @@
 #ifndef FCUEFIS_AIRCRAFT_PROFILE_H
 #define FCUEFIS_AIRCRAFT_PROFILE_H
 
+#include "profile-cleanup.h"
 #include "segment-display.h"
 
 #include <cfloat>
@@ -47,14 +48,13 @@ struct DisplayFlag {
 
 enum class FCUEfisDatarefType : unsigned char {
     SET_VALUE = 1,
-    SET_VALUE_USING_COMMANDS,
+    SET_VALUE_USING_COMMANDS, // Format: "dataref_to_set,lower_value_cmd,raise_value_cmd"
     TOGGLE_VALUE,
     EXECUTE_CMD_ONCE,
+    EXECUTE_CMD_PHASED,
     BAROMETER_PILOT,
     BAROMETER_FO,
-    PUSH_BUTTON,   // for ff767-fcu-efis-profile
-    SET_DUAL_VALUE // for ff767-fcu-efis-profile
-
+    ADJUST_VALUE,
 };
 
 struct FCUEfisButtonDef {
@@ -62,7 +62,6 @@ struct FCUEfisButtonDef {
         std::string dataref;
         FCUEfisDatarefType datarefType = FCUEfisDatarefType::EXECUTE_CMD_ONCE;
         double value = 0.0;
-        std::string secondaryDataref = ""; // for ff767-fcu-efis-profile (optional)
 };
 
 enum class FCUEfisLed : int {
@@ -146,9 +145,38 @@ struct FCUDisplayData {
         bool displayEnabled = true;
         bool displayTest = false;
 
+        enum Window : uint16_t {
+            None = 0,
+            SpeedMachHeader = 1 << 0,
+            SpeedMachValue = 1 << 1,
+            HeadingTrackHeader = 1 << 2,
+            HeadingTrackValue = 1 << 3,
+            HdgTrkVsFpaHeader = 1 << 4,
+            AltitudeHeader = 1 << 5,
+            AltitudeValue = 1 << 6,
+            LevelChangeHeader = 1 << 7,
+            VerticalSpeedFPAHeader = 1 << 8,
+            VerticalSpeedFPAValue = 1 << 9,
+
+            All = SpeedMachHeader |
+                  SpeedMachValue |
+                  HeadingTrackHeader |
+                  HeadingTrackValue |
+                  HdgTrkVsFpaHeader |
+                  AltitudeHeader |
+                  AltitudeValue |
+                  LevelChangeHeader |
+                  VerticalSpeedFPAHeader |
+                  VerticalSpeedFPAValue,
+        };
+
+        uint16_t displayEnabledWindowsFlag = Window::All;
+
         // Display flags
         bool spdMach = false;
-        bool hdgTrk = false;
+        bool headingHdg = false;
+        bool headingTrk = false;
+        bool headingLat = false;
         bool altManaged = false;
         bool spdManaged = false;
         bool hdgManaged = false;
@@ -156,7 +184,6 @@ struct FCUDisplayData {
         bool fpaMode = false;
 
         // Additional display flags for proper 7-segment display
-        bool latMode = false;
         bool altIndication = true;
         bool vsHorizontalLine = true;
         bool vsVerticalLine = false;
@@ -174,14 +201,17 @@ struct FCUDisplayData {
                    altitude == other.altitude &&
                    verticalSpeed == other.verticalSpeed &&
                    spdMach == other.spdMach &&
-                   hdgTrk == other.hdgTrk &&
+                   headingHdg == other.headingHdg &&
+                   headingTrk == other.headingTrk &&
+                   headingLat == other.headingLat &&
                    altManaged == other.altManaged &&
                    spdManaged == other.spdManaged &&
                    hdgManaged == other.hdgManaged &&
                    vsMode == other.vsMode &&
                    fpaMode == other.fpaMode &&
                    displayEnabled == other.displayEnabled &&
-                   displayTest == other.displayTest;
+                   displayTest == other.displayTest &&
+                   displayEnabledWindowsFlag == other.displayEnabledWindowsFlag;
         }
 };
 
@@ -194,7 +224,10 @@ class FCUEfisAircraftProfile {
     public:
         FCUEfisAircraftProfile(ProductFCUEfis *product) :
             product(product) {};
-        virtual ~FCUEfisAircraftProfile() = default;
+
+        virtual ~FCUEfisAircraftProfile() {
+            cleanupProfile(this);
+        }
 
         virtual const std::vector<std::string> &displayDatarefs() const = 0;
         virtual const std::unordered_map<uint16_t, FCUEfisButtonDef> &buttonDefs() const = 0;

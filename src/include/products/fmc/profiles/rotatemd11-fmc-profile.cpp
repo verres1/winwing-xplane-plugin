@@ -2,62 +2,88 @@
 
 #include "config.h"
 #include "dataref.h"
-#include "font.h"
 #include "product-fmc.h"
 
+#include <cmath>
 #include <cstring>
 
-RotateMD11FMCProfile::RotateMD11FMCProfile(ProductFMC *product) :
-    FMCAircraftProfile(product) {
+RotateMD11FMCProfile::RotateMD11FMCProfile(ProductFMC *product) : FMCAircraftProfile(product) {
     product->setAllLedsEnabled(false);
-    product->setFont(Font::GlyphData(FontVariant::FontMD11, product->identifierByte));
+    product->setFont(FontVariant::FontMD11);
 
-    Dataref::getInstance()->monitorExistingDataref<float>("Rotate/aircraft/controls/mcdu_1_brt", [product](float brightness) {
-        // Power is on if either AC bus 1 or emergency AC bus is powered
+    const std::string mcdu =
+        product->deviceVariant == FMCDeviceVariant::VARIANT_FIRSTOFFICER ? "mcdu_2" : product->deviceVariant == FMCDeviceVariant::VARIANT_OBSERVER ? "mcdu_3"
+                                                                                                                                                   : "mcdu_1";
+    const std::string brtDataref = "Rotate/aircraft/systems/" + mcdu + "_brt_rat";
+    const int idx =
+        product->deviceVariant == FMCDeviceVariant::VARIANT_FIRSTOFFICER ? 1 : product->deviceVariant == FMCDeviceVariant::VARIANT_OBSERVER ? 2
+                                                                                                                                            : 0;
+
+    Dataref::getInstance()->monitorExistingDataref<float>(brtDataref.c_str(), [product](float brightness) {
         bool hasPower = Dataref::getInstance()->get<bool>("Rotate/aircraft/systems/elec_ac_bus_1_pwrd") ||
                         Dataref::getInstance()->get<bool>("Rotate/aircraft/systems/elec_emer_ac_bus_l_pwrd");
-        uint8_t target = hasPower ? brightness * 255 : 0;
+        uint8_t target = hasPower ? static_cast<uint8_t>(brightness * 255) : 0;
         product->setLedBrightness(FMCLed::SCREEN_BACKLIGHT, target);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("Rotate/aircraft/controls/instr_panel_lts", [product](float brightness) {
-        // Power is on if either AC bus 1 or emergency AC bus is powered
         bool hasPower = Dataref::getInstance()->get<bool>("Rotate/aircraft/systems/elec_ac_bus_1_pwrd") ||
                         Dataref::getInstance()->get<bool>("Rotate/aircraft/systems/elec_emer_ac_bus_l_pwrd");
-        uint8_t target = hasPower ? brightness * 255 : 0;
+        uint8_t target = hasPower ? static_cast<uint8_t>(brightness * 255) : 0;
         product->setLedBrightness(FMCLed::BACKLIGHT, target);
-    });
+    },
+        this);
 
-    // Monitor both power buses - trigger brightness updates when either changes
-    Dataref::getInstance()->monitorExistingDataref<bool>("Rotate/aircraft/systems/elec_ac_bus_1_pwrd", [](bool poweredOn) {
-        Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/mcdu_1_brt");
+    // Monitor both power buses and re-trigger brightness callbacks when either changes
+    Dataref::getInstance()->monitorExistingDataref<bool>("Rotate/aircraft/systems/elec_ac_bus_1_pwrd", [brtDataref](bool) {
+        Dataref::getInstance()->executeChangedCallbacksForDataref(brtDataref.c_str());
         Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/instr_panel_lts");
-    });
+    },
+        this);
 
-    Dataref::getInstance()->monitorExistingDataref<bool>("Rotate/aircraft/systems/elec_emer_ac_bus_l_pwrd", [](bool poweredOn) {
-        Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/mcdu_1_brt");
+    Dataref::getInstance()->monitorExistingDataref<bool>("Rotate/aircraft/systems/elec_emer_ac_bus_l_pwrd", [brtDataref](bool) {
+        Dataref::getInstance()->executeChangedCallbacksForDataref(brtDataref.c_str());
         Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/instr_panel_lts");
-    });
+    },
+        this);
 
-    // MSG light - monitor int array dataref and use first value
-    Dataref::getInstance()->monitorExistingDataref<std::vector<int>>("Rotate/aircraft/systems/mcdu_msg_lt", [product](std::vector<int> msgLights) {
-        bool msgEnabled = !msgLights.empty() && msgLights[0] > 0;
-        product->setLedBrightness(FMCLed::PFP_MSG, msgEnabled ? 1 : 0);
-        product->setLedBrightness(FMCLed::MCDU_MCDU, msgEnabled ? 1 : 0);
-    });
+    Dataref::getInstance()->monitorExistingDataref<std::vector<int>>("Rotate/aircraft/systems/mcdu_msg_lt", [product, idx](const std::vector<int> &lights) {
+        bool on = idx < static_cast<int>(lights.size()) && lights[idx] > 0;
+        product->setLedBrightness(FMCLed::PFP_MSG, on ? 1 : 0);
+        product->setLedBrightness(FMCLed::MCDU_MCDU, on ? 1 : 0);
+    },
+        this);
 
-    // Trigger backlight and MSG light initialization at startup
-    Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/mcdu_1_brt");
+    Dataref::getInstance()->monitorExistingDataref<std::vector<int>>("Rotate/aircraft/systems/mcdu_dspy_lt", [product, idx](const std::vector<int> &lights) {
+        bool on = idx < static_cast<int>(lights.size()) && lights[idx] > 0;
+        product->setLedBrightness(FMCLed::PFP_CALL_DISPLAY, on ? 1 : 0);
+        product->setLedBrightness(FMCLed::MCDU_IND, on ? 1 : 0);
+    },
+        this);
+
+    Dataref::getInstance()->monitorExistingDataref<std::vector<int>>("Rotate/aircraft/systems/mcdu_fail_lt", [product, idx](const std::vector<int> &lights) {
+        bool on = idx < static_cast<int>(lights.size()) && lights[idx] > 0;
+        product->setLedBrightness(FMCLed::MCDU_FAIL, on ? 1 : 0);
+        product->setLedBrightness(FMCLed::PFP_FAIL, on ? 1 : 0);
+    },
+        this);
+
+    // OFST light
+    Dataref::getInstance()->monitorExistingDataref<std::vector<int>>("Rotate/aircraft/systems/mcdu_ofst_lt", [product, idx](const std::vector<int> &lights) {
+        bool on = idx < static_cast<int>(lights.size()) && lights[idx] > 0;
+        product->setLedBrightness(FMCLed::PFP_OFST, on ? 1 : 0);
+        product->setLedBrightness(FMCLed::MCDU_STATUS, on ? 1 : 0);
+    },
+        this);
+
+    // Trigger initialization
+    Dataref::getInstance()->executeChangedCallbacksForDataref(brtDataref.c_str());
     Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/controls/instr_panel_lts");
     Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/systems/mcdu_msg_lt");
-}
-
-RotateMD11FMCProfile::~RotateMD11FMCProfile() {
-    Dataref::getInstance()->unbind("Rotate/aircraft/controls/mcdu_1_brt");
-    Dataref::getInstance()->unbind("Rotate/aircraft/controls/instr_panel_lts");
-    Dataref::getInstance()->unbind("Rotate/aircraft/systems/elec_ac_bus_1_pwrd");
-    Dataref::getInstance()->unbind("Rotate/aircraft/systems/elec_emer_ac_bus_l_pwrd");
-    Dataref::getInstance()->unbind("Rotate/aircraft/systems/mcdu_msg_lt");
+    Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/systems/mcdu_dspy_lt");
+    Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/systems/mcdu_fail_lt");
+    Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/systems/mcdu_ofst_lt");
 }
 
 bool RotateMD11FMCProfile::IsEligible() {
@@ -69,7 +95,9 @@ bool RotateMD11FMCProfile::shouldReadDatarefAsBytes(const std::string &dataref) 
 }
 
 const std::vector<std::string> &RotateMD11FMCProfile::displayDatarefs() const {
-    const std::string cdu = product->deviceVariant == FMCDeviceVariant::VARIANT_CAPTAIN ? "cdu_0" : "cdu_1";
+    const std::string cdu =
+        product->deviceVariant == FMCDeviceVariant::VARIANT_FIRSTOFFICER ? "cdu_1" : product->deviceVariant == FMCDeviceVariant::VARIANT_OBSERVER ? "cdu_2"
+                                                                                                                                                  : "cdu_0";
     static std::unordered_map<FMCDeviceVariant, std::vector<std::string>> cache;
 
     return cache.try_emplace(product->deviceVariant,
@@ -107,7 +135,12 @@ const std::vector<std::string> &RotateMD11FMCProfile::displayDatarefs() const {
 }
 
 const std::vector<FMCButtonDef> &RotateMD11FMCProfile::buttonDefs() const {
-    const std::string cdu = product->deviceVariant == FMCDeviceVariant::VARIANT_CAPTAIN ? "cdu_0" : "cdu_1";
+    const std::string cdu =
+        product->deviceVariant == FMCDeviceVariant::VARIANT_FIRSTOFFICER ? "cdu_1" : product->deviceVariant == FMCDeviceVariant::VARIANT_OBSERVER ? "cdu_2"
+                                                                                                                                                  : "cdu_0";
+    const std::string mcdu =
+        product->deviceVariant == FMCDeviceVariant::VARIANT_FIRSTOFFICER ? "mcdu_2" : product->deviceVariant == FMCDeviceVariant::VARIANT_OBSERVER ? "mcdu_3"
+                                                                                                                                                   : "mcdu_1";
     static std::unordered_map<FMCDeviceVariant, std::vector<FMCButtonDef>> cache;
 
     return cache.try_emplace(product->deviceVariant,
@@ -131,7 +164,7 @@ const std::vector<FMCButtonDef> &RotateMD11FMCProfile::buttonDefs() const {
                         {FMCKey::PROG, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_PROG"},
                         {std::vector<FMCKey>{FMCKey::MCDU_PERF, FMCKey::PFP3_N1_LIMIT}, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_PERF"},
                         {std::vector<FMCKey>{FMCKey::MCDU_INIT, FMCKey::PFP_INIT_REF}, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_INIT"},
-                        {std::vector<FMCKey>{FMCKey::MCDU_INIT, FMCKey::PFP_HOLD}, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_REF"},
+                        {std::vector<FMCKey>{FMCKey::MCDU_DATA, FMCKey::PFP_HOLD}, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_REF"},
                         {std::vector<FMCKey>{FMCKey::MCDU_FPLN, FMCKey::PFP_ROUTE}, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_FPLN"},
                         {std::vector<FMCKey>{FMCKey::MCDU_RAD_NAV, FMCKey::PFP4_NAV_RAD, FMCKey::PFP7_NAV_RAD}, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_NAVRAD"},
                         {std::vector<FMCKey>{FMCKey::MCDU_SEC_FPLN}, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_SECFPLN"},
@@ -146,8 +179,8 @@ const std::vector<FMCButtonDef> &RotateMD11FMCProfile::buttonDefs() const {
                         {product->hardwareType == FMCHardwareType::HARDWARE_MCDU ? FMCKey::PAGE_NEXT : FMCKey::PFP_EXEC, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_PAGE"},
 
                         // Brightness Controls
-                        {FMCKey::BRIGHTNESS_UP, "Rotate/aircraft/controls_c/mcdu_1_brt_up"},
-                        {FMCKey::BRIGHTNESS_DOWN, "Rotate/aircraft/controls_c/mcdu_1_brt_dn"},
+                        {FMCKey::BRIGHTNESS_UP, "Rotate/aircraft/controls_c/" + mcdu + "_brt_up"},
+                        {FMCKey::BRIGHTNESS_DOWN, "Rotate/aircraft/controls_c/" + mcdu + "_brt_dn"},
 
                         // Numeric Keys
                         {FMCKey::KEY1, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_1"},
@@ -196,7 +229,8 @@ const std::vector<FMCButtonDef> &RotateMD11FMCProfile::buttonDefs() const {
                         {FMCKey::SPACE, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_SPC"},
                         {FMCKey::SLASH, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_BAR"},
                         {FMCKey::CLR, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_CLR"},
-                        {FMCKey::MCDU_OVERFLY, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_MINUS"}})
+                        {FMCKey::MCDU_OVERFLY, "Rotate/aircraft/controls_c/" + cdu + "/mcdu_key_MINUS"},
+                    })
         .first->second;
 }
 
@@ -334,7 +368,9 @@ void RotateMD11FMCProfile::updatePage(std::vector<std::vector<char>> &page) {
     page = std::vector<std::vector<char>>(ProductFMC::PageLines, std::vector<char>(ProductFMC::PageCharsPerLine * ProductFMC::PageBytesPerChar, ' '));
 
     auto datarefManager = Dataref::getInstance();
-    const std::string cdu = product->deviceVariant == FMCDeviceVariant::VARIANT_CAPTAIN ? "cdu_0" : "cdu_1";
+    const std::string cdu =
+        product->deviceVariant == FMCDeviceVariant::VARIANT_FIRSTOFFICER ? "cdu_1" : product->deviceVariant == FMCDeviceVariant::VARIANT_OBSERVER ? "cdu_2"
+                                                                                                                                                  : "cdu_0";
 
     for (int line = 0; line < ProductFMC::PageLines; ++line) {
         std::string contentRef = "Rotate/aircraft/controls/" + cdu + "/mcdu_line_" + std::to_string(line) + "_content";
@@ -369,9 +405,35 @@ void RotateMD11FMCProfile::updatePage(std::vector<std::vector<char>> &page) {
 }
 
 void RotateMD11FMCProfile::buttonPressed(const FMCButtonDef *button, XPLMCommandPhase phase) {
-    if (phase == xplm_CommandContinue) {
+    if (!button || button->dataref.empty() || phase == xplm_CommandContinue) {
         return;
     }
 
-    Dataref::getInstance()->executeCommand(button->dataref.c_str(), phase);
+    auto datarefManager = Dataref::getInstance();
+    if (button->datarefType == FMCDatarefType::SET_VALUE || button->datarefType == FMCDatarefType::SET_VALUE_PHASED) {
+        double value = std::fabs(button->value) < std::numeric_limits<double>::epsilon() ? 1.0 : button->value;
+        if (button->datarefType == FMCDatarefType::SET_VALUE && phase != xplm_CommandBegin) {
+            return;
+        }
+
+        datarefManager->set<double>(button->dataref.c_str(), phase == xplm_CommandBegin ? value : 0.0);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::ADJUST_VALUE) {
+        double currentValue = datarefManager->get<double>(button->dataref.c_str());
+        datarefManager->set<double>(button->dataref.c_str(), currentValue + button->value);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_MULTIPLE_CMD_ONCE) {
+        std::stringstream ss(button->dataref);
+        std::string item;
+        std::vector<std::string> commands;
+        while (std::getline(ss, item, ',')) {
+            commands.push_back(item);
+        }
+
+        for (const auto &cmd : commands) {
+            datarefManager->executeCommand(cmd.c_str());
+        }
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_CMD_ONCE) {
+        datarefManager->executeCommand(button->dataref.c_str());
+    } else {
+        datarefManager->executeCommand(button->dataref.c_str(), phase);
+    }
 }

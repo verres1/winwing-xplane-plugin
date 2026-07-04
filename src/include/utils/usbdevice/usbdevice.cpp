@@ -2,13 +2,17 @@
 
 #include "appstate.h"
 #include "product-agp.h"
-#include "product-ecam32.h"
+#include "product-ecam.h"
 #include "product-fcu-efis.h"
 #include "product-fmc.h"
+#include "product-joystick.h"
+#include "product-orion-throttle.h"
 #include "product-pap3-mcp.h"
 #include "product-pdc.h"
-#include "product-ursa-minor-joystick.h"
+#include "product-rmp.h"
+#include "product-tcas.h"
 #include "product-ursa-minor-throttle.h"
+#include "xplane-bindings.h"
 
 #include <XPLMUtilities.h>
 
@@ -16,19 +20,36 @@
 __attribute__((weak)) void notifyButtonPressed(uint16_t buttonId, uint16_t productId) {}
 
 USBDevice *USBDevice::Device(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName) {
-    if (vendorId != WINWING_VENDOR_ID) {
-        debug("Vendor ID mismatch: 0x%04X != 0x%04X\n", vendorId, WINWING_VENDOR_ID);
+    if (vendorId != WINCTRL_VENDOR_ID) {
+        Logger::getInstance()->debug("Vendor ID mismatch: 0x%04X != 0x%04X\n", vendorId, WINCTRL_VENDOR_ID);
         return nullptr;
     }
 
     switch (productId) {
         case 0xBC27: { // URSA MINOR Airline Joystick L
             constexpr uint8_t identifierByte = 0x07;
-            return new ProductUrsaMinorJoystick(hidDevice, vendorId, productId, vendorName, productName, identifierByte);
+            constexpr uint8_t motorCode = 0xBF;
+            return new ProductJoystick(hidDevice, vendorId, productId, vendorName, productName, identifierByte, motorCode);
         }
         case 0xBC28: { // URSA MINOR Airline Joystick R
             constexpr uint8_t identifierByte = 0x08;
-            return new ProductUrsaMinorJoystick(hidDevice, vendorId, productId, vendorName, productName, identifierByte);
+            constexpr uint8_t motorCode = 0xBF;
+            return new ProductJoystick(hidDevice, vendorId, productId, vendorName, productName, identifierByte, motorCode);
+        }
+        case 0xBC2A: { // URSA MINOR Fighter Joystick L
+            constexpr uint8_t identifierByte = 0x0A;
+            constexpr uint8_t motorCode = 0xBF;
+            return new ProductJoystick(hidDevice, vendorId, productId, vendorName, productName, identifierByte, motorCode);
+        }
+        case 0xBC29: { // URSA MINOR Fighter Joystick R
+            constexpr uint8_t identifierByte = 0x09;
+            constexpr uint8_t motorCode = 0xBF;
+            return new ProductJoystick(hidDevice, vendorId, productId, vendorName, productName, identifierByte, motorCode);
+        }
+        case 0xBEA8: { // WINWING Orion Joystick Base 2 + JGRIP-F16
+            constexpr uint8_t identifierByte = 0x01;
+            constexpr uint8_t motorCode = 0x00;
+            return new ProductJoystick(hidDevice, vendorId, productId, vendorName, productName, identifierByte, motorCode);
         }
 
         case 0xBB36: { // MCDU-32 (Captain)
@@ -112,24 +133,46 @@ USBDevice *USBDevice::Device(HIDDeviceHandle hidDevice, uint16_t vendorId, uint1
             return new ProductPDC(hidDevice, vendorId, productId, vendorName, productName, PDCDeviceVariant::VARIANT_3M_FIRSTOFFICER, identifierByte);
         }
 
-        case 0xBB70: // ECAM32
-            return new ProductECAM32(hidDevice, vendorId, productId, vendorName, productName);
+        case 0xBB70: // ECAM
+            return new ProductECAM(hidDevice, vendorId, productId, vendorName, productName);
 
         case 0xBB80: // AGP
             return new ProductAGP(hidDevice, vendorId, productId, vendorName, productName);
+
+        case 0xBB81: // TCAS
+            return new ProductTCAS(hidDevice, vendorId, productId, vendorName, productName);
+
+        case 0xBB83: // RMP L
+        case 0xBB84: // RMP R
+        case 0xBB85: // RMP C
+            return new ProductRMP(hidDevice, vendorId, productId, vendorName, productName);
 
         case 0xB920: // URSA MINOR 32 Throttle Metal L
         case 0xB930: // URSA MINOR 32 Throttle Metal R
             return new ProductUrsaMinorThrottle(hidDevice, vendorId, productId, vendorName, productName);
 
+        case 0xBD64: // Orion Throttle Base II + F15EX HANDLE L + F15EX HANDLE R
+            return new ProductOrionThrottle(hidDevice, vendorId, productId, vendorName, productName);
+
+            // Not yet implemented devices:
+            // 0xB980 = WINCTRL Orion 32 Rudder Pedals Metal
+
         default:
-            debug("Unknown Winwing device - vendorId: 0x%04X, productId: 0x%04X (%s)\n", vendorId, productId, productName.c_str());
+            Logger::getInstance()->info("Unknown WINCTRL device - vendorId: 0x%04X, productId: 0x%04X (%s)\n", vendorId, productId, productName.c_str());
             return nullptr;
     }
 }
 
 const char *USBDevice::classIdentifier() {
     return "USBDevice (none)";
+}
+
+const char *USBDevice::activeProfileName() const {
+    return "none";
+}
+
+void USBDevice::blackout() {
+    // noop, expect override
 }
 
 void USBDevice::didReceiveData(int reportId, uint8_t *report, int reportLength) {
@@ -142,7 +185,15 @@ void USBDevice::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uin
     }
 }
 
+bool USBDevice::isButtonHandledByXPlane(uint16_t hardwareButtonIndex) {
+    return XPlaneBindings::getInstance()->isButtonBound(vendorId, productId, hardwareButtonIndex);
+}
+
 void USBDevice::processOnMainThread(const InputEvent &event) {
+    if (!connected) {
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(eventQueueMutex);
     eventQueue.push(event);
 }

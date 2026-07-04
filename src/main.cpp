@@ -3,6 +3,7 @@
 #include "dataref.h"
 #include "plugins-menu.h"
 #include "usbcontroller.h"
+#include "xplane-bindings.h"
 
 #include <algorithm>
 #include <cmath>
@@ -35,14 +36,14 @@ void menuAction(void *mRef, void *iRef);
 PLUGIN_API int XPluginStart(char *name, char *sig, char *desc) {
     strcpy(name, FRIENDLY_NAME);
     strcpy(sig, BUNDLE_ID);
-    strcpy(desc, "Winwing X-Plane plugin");
+    strcpy(desc, "WINCTRL X-Plane plugin");
     XPLMEnableFeature("XPLM_USE_NATIVE_PATHS", 1);
     XPLMEnableFeature("XPLM_USE_NATIVE_WIDGET_WINDOWS", 1);
     XPLMEnableFeature("XPLM_WANTS_DATAREF_NOTIFICATIONS", 1);
 
     // Add "Reload devices" menu item
     PluginsMenu::getInstance()->addPersistentItem("Reload devices", [](int itemIndex) {
-        debug_force("Reloading devices...\n");
+        Logger::getInstance()->info("Reloading devices...\n");
         USBController::getInstance()->disconnectAllDevices();
         PluginsMenu::getInstance()->clearAllItems();
         USBController::getInstance()->connectAllDevices();
@@ -54,18 +55,22 @@ PLUGIN_API int XPluginStart(char *name, char *sig, char *desc) {
 
         PluginsMenu::getInstance()->setItemName(itemIndex, debugLoggingEnabled ? "Debug logging enabled" : "Enable debug logging");
         PluginsMenu::getInstance()->setItemChecked(itemIndex, debugLoggingEnabled);
-        AppState::getInstance()->debuggingEnabled = debugLoggingEnabled;
+        Logger::getInstance()->setLogLevel(debugLoggingEnabled ? LogLevel::VERBOSE : LogLevel::INFO);
 
         if (debugLoggingEnabled) {
-            debug_force("Debug logging was enabled for plugin version %s. Currently connected devices (%lu):\n", VERSION, USBController::getInstance()->devices.size());
+            Logger::getInstance()->info("Debug logging was enabled for plugin version %s. Currently connected devices (%lu):\n", VERSION, USBController::getInstance()->devices.size());
+
+            if (USBController::getInstance()->devices.empty()) {
+                Logger::getInstance()->info("- No connected devices.\n");
+            }
 
             for (auto &device : USBController::getInstance()->devices) {
-                debug_force("- (vendorId: 0x%04X, productId: 0x%04X, handler: %s) %s\n", device->vendorId, device->productId, device->classIdentifier(), device->productName.c_str());
+                Logger::getInstance()->info("- (vendorId: 0x%04X, productId: 0x%04X, handler: %s) %s\n", device->vendorId, device->productId, device->classIdentifier(), device->productName.c_str());
             }
 
             auto action = std::make_shared<std::function<void()>>();
             *action = [action]() {
-                if (!AppState::getInstance()->debuggingEnabled) {
+                if (Logger::getInstance()->getLogLevel() != LogLevel::VERBOSE) {
                     return;
                 }
 
@@ -83,45 +88,34 @@ PLUGIN_API int XPluginStart(char *name, char *sig, char *desc) {
                 char timeBuffer[9];
                 strftime(timeBuffer, sizeof(timeBuffer), "%H:%M:%S", &localTime);
 
-                debug_force("[%s.%03lld] Write queue sizes:\n", timeBuffer, nowMs.count());
-                for (auto &device : USBController::getInstance()->devices) {
-                    debug_force("[%s.%03lld] - %s: %zu pending packets\n", timeBuffer, nowMs.count(), device->classIdentifier(), device->getWriteQueueSize());
-                }
-
-                // Report top dataref accesses
-                auto &stats = Dataref::getInstance()->getAccessStats();
-                if (!stats.empty()) {
-                    std::vector<std::pair<std::string, uint64_t>> sorted(stats.begin(), stats.end());
-                    std::sort(sorted.begin(), sorted.end(), [](const auto &a, const auto &b) {
-                        return a.second > b.second;
-                    });
-
-                    debug_force("[%s.%03lld] Top dataref accesses (last 5s):\n", timeBuffer, nowMs.count());
-                    size_t count = std::min(sorted.size(), size_t(10));
-                    for (size_t i = 0; i < count; i++) {
-                        debug_force("[%s.%03lld] - %s: %llu calls (%.1f/sec)\n",
-                            timeBuffer, nowMs.count(), sorted[i].first.c_str(), sorted[i].second, sorted[i].second / 5.0);
+                if (USBController::getInstance()->devices.empty()) {
+                    Logger::getInstance()->info("[%s.%03lld] No connected devices.\n", timeBuffer, nowMs.count());
+                } else {
+                    Logger::getInstance()->info("[%s.%03lld] Write queue sizes:\n", timeBuffer, nowMs.count());
+                    for (auto &device : USBController::getInstance()->devices) {
+                        Logger::getInstance()->info("[%s.%03lld] - %s (%s): %zu pending packets\n", timeBuffer, nowMs.count(), device->classIdentifier(), device->activeProfileName(), device->getWriteQueueSize());
                     }
-                    Dataref::getInstance()->resetAccessStats();
                 }
 
-                AppState::getInstance()->executeAfter(5000, *action);
+                AppState::getInstance()->executeAfter(5000, nullptr, *action);
             };
 
             (*action)();
         } else {
-            debug_force("Debug logging was disabled.\n");
+            Logger::getInstance()->info("Debug logging was disabled.\n");
         }
     });
 
-    debug_force("Plugin started (version %s)\n", VERSION);
+    Logger::getInstance()->info("Plugin started (version %s)\n", VERSION);
 
     return 1;
 }
 
 PLUGIN_API void XPluginStop(void) {
+    USBController::getInstance()->disconnectAllDevices();
+    PluginsMenu::getInstance()->teardown();
     AppState::getInstance()->deinitialize();
-    debug_force("Plugin stopped\n");
+    Logger::getInstance()->info("Plugin stopped\n");
 }
 
 PLUGIN_API int XPluginEnable(void) {
@@ -131,7 +125,8 @@ PLUGIN_API int XPluginEnable(void) {
 }
 
 PLUGIN_API void XPluginDisable(void) {
-    debug_force("Disabling plugin...\n");
+    Logger::getInstance()->info("Disabling plugin...\n");
+    USBController::getInstance()->disconnectAllDevices();
 }
 
 PLUGIN_API void XPluginReceiveMessage(XPLMPluginID from, long msg, void *params) {
@@ -143,6 +138,7 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID from, long msg, void *params)
             }
 
             AppState::getInstance()->initialize();
+            XPlaneBindings::getInstance()->reload();
             USBController::getInstance()->connectAllDevices();
             break;
         }
@@ -155,16 +151,17 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID from, long msg, void *params)
 
             USBController::getInstance()->disconnectAllDevices();
             PluginsMenu::getInstance()->clearAllItems();
+
+            // The profiles unbind their own monitors on destruction; this
+            // drops the leftover display/getCached entries and stale handles
+            // so they don't accrete (and get polled) across aircraft switches.
+            Dataref::getInstance()->clearCache();
             break;
         }
 
         case XPLM_MSG_AIRPORT_LOADED: {
             break;
         }
-
-        case XPLM_MSG_WILL_WRITE_PREFS:
-            // AppState::getInstance()->saveState();
-            break;
 
         default:
             break;

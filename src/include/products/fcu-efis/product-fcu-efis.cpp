@@ -4,12 +4,24 @@
 #include "config.h"
 #include "dataref.h"
 #include "plugins-menu.h"
+#include "profiles/c172-fcu-efis-profile.h"
+#include "profiles/cis-seneca-fcu-efis-profile.h"
 #include "profiles/ff350-fcu-efis-profile.h"
 #include "profiles/ff767-fcu-efis-profile.h"
 #include "profiles/ff777-fcu-efis-profile.h"
-#include "profiles/laminar-fcu-efis-profile.h"
-#include "profiles/laminar737-fcu-efis-profile.h"
+#include "profiles/fps748-fcu-efis-profile.h"
+#include "profiles/jar330-fcu-efis-profile.h"
+#include "profiles/jf146-fcu-efis-profile.h"
+#include "profiles/kingair350-fcu-efis-profile.h"
+#include "profiles/laminar-737-fcu-efis-profile.h"
+#include "profiles/laminar-a333-fcu-efis-profile.h"
+#include "profiles/rotatemd11-fcu-efis-profile.h"
+#include "profiles/sparky744-fcu-efis-profile.h"
+#include "profiles/stratosphere77w-fcu-efis-profile.h"
 #include "profiles/toliss-fcu-efis-profile.h"
+#include "profiles/xcrafts-ejets-fcu-efis-profile.h"
+#include "profiles/xcrafts-erj-fcu-efis-profile.h"
+#include "profiles/zibo-fcu-efis-profile.h"
 #include "segment-display.h"
 
 #include <algorithm>
@@ -21,9 +33,9 @@
 #include <XPLMProcessing.h>
 #include <XPLMUtilities.h>
 
-ProductFCUEfis::ProductFCUEfis(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName) :
-    USBDevice(hidDevice, vendorId, productId, vendorName, productName) {
+ProductFCUEfis::ProductFCUEfis(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName) : USBDevice(hidDevice, vendorId, productId, vendorName, productName) {
     profile = nullptr;
+    menuItemId = -1;
     displayData = {};
     lastUpdateCycle = 0;
     pressedButtonIndices = {};
@@ -32,21 +44,47 @@ ProductFCUEfis::ProductFCUEfis(HIDDeviceHandle hidDevice, uint16_t vendorId, uin
 }
 
 ProductFCUEfis::~ProductFCUEfis() {
-    disconnect();
+    AppState::getInstance()->cancelTasksForOwner(this);
+    blackout();
+
+    PluginsMenu::getInstance()->removeItem(menuItemId);
+
+    if (profile) {
+        delete profile;
+        profile = nullptr;
+    }
 }
 
 void ProductFCUEfis::setProfileForCurrentAircraft() {
-    if (FF350FCUEfisProfile::IsEligible()) {
+    if (RotateMD11FCUEfisProfile::IsEligible()) {
+        profile = new RotateMD11FCUEfisProfile(this);
+        profileReady = true;
+    } else if (JAR330FCUEfisProfile::IsEligible()) {
+        profile = new JAR330FCUEfisProfile(this);
+        profileReady = true;
+    } else if (FF350FCUEfisProfile::IsEligible()) {
         profile = new FF350FCUEfisProfile(this);
+        profileReady = true;
+    } else if (XCraftsEjetsFCUEfisProfile::IsEligible()) {
+        profile = new XCraftsEjetsFCUEfisProfile(this);
+        profileReady = true;
+    } else if (XCraftsErjFCUEfisProfile::IsEligible()) {
+        profile = new XCraftsErjFCUEfisProfile(this);
         profileReady = true;
     } else if (TolissFCUEfisProfile::IsEligible()) {
         profile = new TolissFCUEfisProfile(this);
         profileReady = true;
-    } else if (Laminar737FCUEfisProfile::IsEligible()) {
-        profile = new Laminar737FCUEfisProfile(this);
+    } else if (C172FCUEfisProfile::IsEligible()) {
+        profile = new C172FCUEfisProfile(this);
         profileReady = true;
-    } else if (LaminarFCUEfisProfile::IsEligible()) {
-        profile = new LaminarFCUEfisProfile(this);
+    } else if (CISSenecaFCUEfisProfile::IsEligible()) {
+        profile = new CISSenecaFCUEfisProfile(this);
+        profileReady = true;
+    } else if (LaminarA333FCUEfisProfile::IsEligible()) {
+        profile = new LaminarA333FCUEfisProfile(this);
+        profileReady = true;
+    } else if (Strato77WFCUEfisProfile::IsEligible()) {
+        profile = new Strato77WFCUEfisProfile(this);
         profileReady = true;
     } else if (FF777FCUEfisProfile::IsEligible()) {
         profile = new FF777FCUEfisProfile(this);
@@ -54,6 +92,27 @@ void ProductFCUEfis::setProfileForCurrentAircraft() {
     } else if (FF767FCUEfisProfile::IsEligible()) {
         profile = new FF767FCUEfisProfile(this);
         profileReady = true;
+    } else if (FPS748FCUEfisProfile::IsEligible()) {
+        profile = new FPS748FCUEfisProfile(this);
+        profileReady = true;
+    } else if (SparkyB744FCUEfisProfile::IsEligible()) {
+        profile = new SparkyB744FCUEfisProfile(this);
+        profileReady = true;
+    } else if (JF146FCUEfisProfile::IsEligible()) {
+        profile = new JF146FCUEfisProfile(this);
+        profileReady = true;
+    } else if (KingAir350FCUEfisProfile::IsEligible()) {
+        profile = new KingAir350FCUEfisProfile(this);
+        profileReady = true;
+    } else if (ZiboFCUEfisProfile::IsEligible()) {
+        profile = new ZiboFCUEfisProfile(this);
+        profileReady = true;
+    } else if (Laminar737FCUEfisProfile::IsEligible()) {
+        profile = new Laminar737FCUEfisProfile(this);
+        profileReady = true;
+    } else {
+        profile = nullptr;
+        profileReady = false;
     }
 }
 
@@ -61,20 +120,24 @@ const char *ProductFCUEfis::classIdentifier() {
     return "FCU-EFIS";
 }
 
+const char *ProductFCUEfis::activeProfileName() const {
+    return profile ? typeid(*profile).name() : "none";
+}
+
 bool ProductFCUEfis::connect() {
     if (USBDevice::connect()) {
         initializeDisplays();
 
         // Set initial LED brightness
-        setLedBrightness(FCUEfisLed::BACKLIGHT, 180);
-        setLedBrightness(FCUEfisLed::SCREEN_BACKLIGHT, 180);
-        setLedBrightness(FCUEfisLed::EFISL_BACKLIGHT, 180);
-        setLedBrightness(FCUEfisLed::EFISL_SCREEN_BACKLIGHT, 180);
-        setLedBrightness(FCUEfisLed::EFISR_BACKLIGHT, 180);
-        setLedBrightness(FCUEfisLed::EFISR_SCREEN_BACKLIGHT, 180);
+        setLedBrightness(FCUEfisLed::BACKLIGHT, 0);
+        setLedBrightness(FCUEfisLed::SCREEN_BACKLIGHT, 0);
+        setLedBrightness(FCUEfisLed::EFISL_BACKLIGHT, 0);
+        setLedBrightness(FCUEfisLed::EFISL_SCREEN_BACKLIGHT, 0);
+        setLedBrightness(FCUEfisLed::EFISR_BACKLIGHT, 0);
+        setLedBrightness(FCUEfisLed::EFISR_SCREEN_BACKLIGHT, 0);
 
         setLedBrightness(FCUEfisLed::EXPED_GREEN, 0);
-        setLedBrightness(FCUEfisLed::EXPED_BACKLIGHT, 255);
+        setLedBrightness(FCUEfisLed::EXPED_BACKLIGHT, 0);
 
         if (!profile) {
             setProfileForCurrentAircraft();
@@ -95,7 +158,7 @@ bool ProductFCUEfis::connect() {
                      setLedBrightness(FCUEfisLed::EFISL_OVERALL_GREEN, 255);
                      setLedBrightness(FCUEfisLed::EFISR_OVERALL_GREEN, 255);
                      setAllLedsEnabled(true);
-                     AppState::getInstance()->executeAfter(2000, [this]() {
+                     AppState::getInstance()->executeAfter(2000, this, [this]() {
                          setAllLedsEnabled(false);
                      });
                  }},
@@ -107,11 +170,11 @@ bool ProductFCUEfis::connect() {
     return false;
 }
 
-void ProductFCUEfis::disconnect() {
+void ProductFCUEfis::blackout() {
     setLedBrightness(FCUEfisLed::BACKLIGHT, 0);
     setLedBrightness(FCUEfisLed::SCREEN_BACKLIGHT, 0);
     setLedBrightness(FCUEfisLed::OVERALL_GREEN, 0);
-    
+
     setLedBrightness(FCUEfisLed::EFISR_BACKLIGHT, 0);
     setLedBrightness(FCUEfisLed::EFISR_SCREEN_BACKLIGHT, 0);
     setLedBrightness(FCUEfisLed::EFISR_OVERALL_GREEN, 0);
@@ -122,15 +185,6 @@ void ProductFCUEfis::disconnect() {
     setAllLedsEnabled(false);
 
     clearDisplays();
-
-    PluginsMenu::getInstance()->removeItem(menuItemId);
-
-    if (profile) {
-        delete profile;
-        profile = nullptr;
-    }
-
-    USBDevice::disconnect();
 }
 
 void ProductFCUEfis::update() {
@@ -152,6 +206,10 @@ void ProductFCUEfis::update() {
 }
 
 void ProductFCUEfis::updateDisplays(bool force) {
+    if (!connected || !profile) {
+        return;
+    }
+
     bool shouldUpdate = force;
     auto datarefManager = Dataref::getInstance();
     for (const std::string &dataref : profile->displayDatarefs()) {
@@ -221,85 +279,122 @@ void ProductFCUEfis::sendFCUDisplay(const std::string &speed, const std::string 
     std::vector<uint8_t> flagBytes(17, 0);
 
     // Set flags based on display data
-    if (displayData.spdMach) {
-        flagBytes[static_cast<int>(DisplayByteIndex::H3)] |= 0x04;
-    }
-    if (displayData.spdManaged) {
-        flagBytes[static_cast<int>(DisplayByteIndex::H3)] |= 0x02;
-    }
-    if (!displayData.spdMach) {
-        flagBytes[static_cast<int>(DisplayByteIndex::H3)] |= 0x08; // SPD
+    if (displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::SpeedMachHeader) {
+        if (displayData.spdMach) {
+            flagBytes[static_cast<int>(DisplayByteIndex::H3)] |= 0x04; // Mach
+        } else {
+            flagBytes[static_cast<int>(DisplayByteIndex::H3)] |= 0x08; // SPD
+        }
     }
 
-    if (displayData.hdgTrk) {
-        flagBytes[static_cast<int>(DisplayByteIndex::H0)] |= 0x40; // TRK
-    } else {
-        flagBytes[static_cast<int>(DisplayByteIndex::H0)] |= 0x80; // HDG
-    }
-    if (displayData.hdgManaged) {
-        flagBytes[static_cast<int>(DisplayByteIndex::H0)] |= 0x10;
-    }
-    if (displayData.latMode) {
-        flagBytes[static_cast<int>(DisplayByteIndex::H0)] |= 0x20; // LAT
+    if (displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::SpeedMachValue) {
+        if (displayData.spdMach) {
+            flagBytes[static_cast<int>(DisplayByteIndex::S1)] |= 0x01; // Mach comma
+        }
+
+        if (displayData.spdManaged) {
+            flagBytes[static_cast<int>(DisplayByteIndex::H3)] |= 0x02;
+        }
     }
 
-    if (displayData.altIndication) {
-        flagBytes[static_cast<int>(DisplayByteIndex::A4)] |= 0x10; // ALT
-    }
-    if (displayData.altManaged) {
-        flagBytes[static_cast<int>(DisplayByteIndex::V1)] |= 0x10;
+    if (displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::HeadingTrackHeader) {
+        if (displayData.headingHdg) {
+            flagBytes[static_cast<int>(DisplayByteIndex::H0)] |= 0x80; // HDG
+        }
+
+        if (displayData.headingTrk) {
+            flagBytes[static_cast<int>(DisplayByteIndex::H0)] |= 0x40; // TRK
+        }
+
+        if (displayData.headingLat) {
+            flagBytes[static_cast<int>(DisplayByteIndex::H0)] |= 0x20; // LAT
+        }
     }
 
-    if (displayData.vsMode) {
-        flagBytes[static_cast<int>(DisplayByteIndex::A5)] |= 0x04; // V/S
-    }
-    if (displayData.fpaMode) {
-        flagBytes[static_cast<int>(DisplayByteIndex::A5)] |= 0x01; // FPA
-    }
-    if (displayData.hdgTrk) {
-        flagBytes[static_cast<int>(DisplayByteIndex::A5)] |= 0x02; // TRK
-    }
-    if (!displayData.hdgTrk) {
-        flagBytes[static_cast<int>(DisplayByteIndex::A5)] |= 0x08; // HDG
+    if (displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::HeadingTrackValue) {
+        if (displayData.hdgManaged) {
+            flagBytes[static_cast<int>(DisplayByteIndex::H0)] |= 0x10;
+        }
     }
 
-    if (displayData.vsHorizontalLine) {
-        flagBytes[static_cast<int>(DisplayByteIndex::A0)] |= 0x10;
-    }
-    if (displayData.vsVerticalLine) {
-        flagBytes[static_cast<int>(DisplayByteIndex::V2)] |= 0x20; // Move to different bit
-    }
-    if (displayData.lvlChange) {
-        flagBytes[static_cast<int>(DisplayByteIndex::A2)] |= 0x10;
-    }
-    if (displayData.lvlChangeLeft) {
-        flagBytes[static_cast<int>(DisplayByteIndex::A3)] |= 0x10;
-    }
-    if (displayData.lvlChangeRight) {
-        flagBytes[static_cast<int>(DisplayByteIndex::A1)] |= 0x10;
+    if (displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::HdgTrkVsFpaHeader) {
+        if (displayData.vsMode) {
+            flagBytes[static_cast<int>(DisplayByteIndex::A5)] |= 0x04; // V/S
+        }
+        if (displayData.fpaMode) {
+            flagBytes[static_cast<int>(DisplayByteIndex::A5)] |= 0x01; // FPA
+        }
+
+        if (displayData.headingHdg) {
+            flagBytes[static_cast<int>(DisplayByteIndex::A5)] |= 0x08; // HDG
+        }
+        if (displayData.headingTrk) {
+            flagBytes[static_cast<int>(DisplayByteIndex::A5)] |= 0x02; // TRK
+        }
     }
 
-    if (displayData.vsIndication) {
-        flagBytes[static_cast<int>(DisplayByteIndex::V0)] |= 0x40;
-    }
-    if (displayData.fpaIndication) {
-        flagBytes[static_cast<int>(DisplayByteIndex::V0)] |= 0x80;
-    }
-    if (displayData.fpaComma) {
-        flagBytes[static_cast<int>(DisplayByteIndex::V3)] |= 0x10; // Decimal after 1st digit for X.XX format
-    }
-    if (displayData.vsSign) {
-        flagBytes[static_cast<int>(DisplayByteIndex::V2)] |= 0x10; // VS sign: true = positive, false = negative (per Python impl)
-    }
-    if (displayData.spdMach) { // Mach comma
-        flagBytes[static_cast<int>(DisplayByteIndex::S1)] |= 0x01;
+    if (displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::AltitudeHeader) {
+        if (displayData.altIndication) {
+            flagBytes[static_cast<int>(DisplayByteIndex::A4)] |= 0x10; // ALT
+        }
     }
 
-    if (!displayData.displayEnabled || displayData.displayTest) {
+    if (displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::AltitudeValue) {
+        if (displayData.altManaged) {
+            flagBytes[static_cast<int>(DisplayByteIndex::V1)] |= 0x10;
+        }
+    }
+
+    if (displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::LevelChangeHeader) {
+        if (displayData.lvlChange) {
+            flagBytes[static_cast<int>(DisplayByteIndex::A2)] |= 0x10;
+        }
+        if (displayData.lvlChangeLeft) {
+            flagBytes[static_cast<int>(DisplayByteIndex::A3)] |= 0x10;
+        }
+        if (displayData.lvlChangeRight) {
+            flagBytes[static_cast<int>(DisplayByteIndex::A1)] |= 0x10;
+        }
+    }
+
+    if (displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::VerticalSpeedFPAHeader) {
+        if (displayData.vsIndication) {
+            flagBytes[static_cast<int>(DisplayByteIndex::V0)] |= 0x40;
+        }
+        if (displayData.fpaIndication) {
+            flagBytes[static_cast<int>(DisplayByteIndex::V0)] |= 0x80;
+        }
+    }
+
+    if (displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::VerticalSpeedFPAValue) {
+        if (displayData.vsHorizontalLine) {
+            flagBytes[static_cast<int>(DisplayByteIndex::A0)] |= 0x10;
+        }
+        if (displayData.vsVerticalLine) {
+            flagBytes[static_cast<int>(DisplayByteIndex::V2)] |= 0x20; // Move to different bit
+        }
+        if (displayData.fpaComma) {
+            flagBytes[static_cast<int>(DisplayByteIndex::V3)] |= 0x10; // Decimal after 1st digit for X.XX format
+        }
+        if (displayData.vsSign) {
+            flagBytes[static_cast<int>(DisplayByteIndex::V2)] |= 0x10; // VS sign: true = positive, false = negative
+        }
+    }
+
+    bool displayOffOrTesting = !displayData.displayEnabled || displayData.displayTest;
+    if (displayOffOrTesting || !(displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::SpeedMachValue)) {
         std::fill(speedData.begin(), speedData.end(), displayData.displayTest ? 0xFF : 0);
+    }
+    if (displayOffOrTesting || !(displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::HeadingTrackValue)) {
         std::fill(headingData.begin(), headingData.end(), displayData.displayTest ? 0xFF : 0);
+    }
+    if (displayOffOrTesting || !(displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::AltitudeValue)) {
         std::fill(altitudeData.begin(), altitudeData.end(), displayData.displayTest ? 0xFF : 0);
+    }
+    if (displayOffOrTesting || !(displayData.displayEnabledWindowsFlag & FCUDisplayData::Window::VerticalSpeedFPAValue)) {
         std::fill(vsData.begin(), vsData.end(), displayData.displayTest ? 0xFF : 0);
+    }
+    if (displayOffOrTesting) {
         std::fill(flagBytes.begin(), flagBytes.end(), displayData.displayTest ? 0xFF : 0);
     }
 
@@ -362,40 +457,44 @@ void ProductFCUEfis::sendEfisDisplayWithFlags(EfisDisplayValue *data, bool isRig
     }
 
     // EFIS display protocol
-    std::vector<uint8_t> payload = {
+    std::vector<uint8_t> packet = {
         0xF0, 0x00, packetNumber, 0x1A, static_cast<uint8_t>(isRightSide ? ProductFCUEfis::EfisRightIdentifierByte : ProductFCUEfis::EfisLeftIdentifierByte), 0xBF, 0x00, 0x00, 0x02, 0x01, 0x00, 0x00, 0xFF, 0xFF, 0x1D, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     // Add barometric data
     auto baroData = SegmentDisplay::encodeStringEfis(4, SegmentDisplay::fixStringLength(data->isStd ? "STD " : data->baro, 4));
 
-    if (data->displayTest) {
-        payload.push_back(SegmentDisplay::getSegmentMask('8'));
-        payload.push_back(SegmentDisplay::getSegmentMask('8') | 0x80);
-        payload.push_back(SegmentDisplay::getSegmentMask('8'));
-        payload.push_back(SegmentDisplay::getSegmentMask('8'));
-        payload.push_back(0xFF);
-    } else {
-        payload.push_back(baroData[3]);
-        payload.push_back(baroData[2] | flagBytes[static_cast<int>(isRightSide ? DisplayByteIndex::EFISR_B2 : DisplayByteIndex::EFISL_B2)]);
-        payload.push_back(baroData[1]);
-        payload.push_back(baroData[0]);
-        payload.push_back(flagBytes[static_cast<int>(isRightSide ? DisplayByteIndex::EFISR_B0 : DisplayByteIndex::EFISL_B0)]);
-    }
-
     if (!data->displayEnabled) {
-        std::fill(baroData.begin(), baroData.end(), 0);
-        std::fill(flagBytes.begin(), flagBytes.end(), 0);
+        packet.push_back(0x00);
+        packet.push_back(0x00);
+        packet.push_back(0x00);
+        packet.push_back(0x00);
+        packet.push_back(0x00);
+    } else if (data->displayTest) {
+        packet.push_back(SegmentDisplay::getSegmentMask('8'));
+        packet.push_back(SegmentDisplay::getSegmentMask('8') | 0x80);
+        packet.push_back(SegmentDisplay::getSegmentMask('8'));
+        packet.push_back(SegmentDisplay::getSegmentMask('8'));
+        packet.push_back(0xFF);
+    } else {
+        packet.push_back(baroData[3]);
+        packet.push_back(baroData[2] | flagBytes[static_cast<int>(isRightSide ? DisplayByteIndex::EFISR_B2 : DisplayByteIndex::EFISL_B2)]);
+        packet.push_back(baroData[1]);
+        packet.push_back(baroData[0]);
+        packet.push_back(flagBytes[static_cast<int>(isRightSide ? DisplayByteIndex::EFISR_B0 : DisplayByteIndex::EFISL_B0)]);
     }
-
-    // Add second command
-    payload.insert(payload.end(), {0x0E, 0xBF, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x4C, 0x0C, 0x1D});
 
     // Pad to 64 bytes
-    while (payload.size() < 64) {
-        payload.push_back(0x00);
+    while (packet.size() < 64) {
+        packet.push_back(0x00);
     }
 
-    writeData(payload);
+    writeData(packet);
+
+    std::vector<uint8_t> commitPacket = {
+        0xF0, 0x00, packetNumber, 0x11, static_cast<uint8_t>(isRightSide ? ProductFCUEfis::EfisRightIdentifierByte : ProductFCUEfis::EfisLeftIdentifierByte),
+        0xBF, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x4C, 0x0C, 0x1D, 0x00};
+    commitPacket.resize(64, 0x00);
+    writeData(commitPacket);
     if (++packetNumber == 0) {
         packetNumber = 1;
     }
@@ -436,8 +535,6 @@ void ProductFCUEfis::setLedBrightness(FCUEfisLed led, uint8_t brightness) {
 
     if (!data.empty()) {
         writeData(data);
-    } else {
-        debug("No LED data generated for LED %d\n", ledValue);
     }
 }
 
@@ -455,14 +552,6 @@ void ProductFCUEfis::didReceiveData(int reportId, uint8_t *report, int reportLen
     }
 
     if (reportId != 1 || reportLength < 13) {
-#if DEBUG
-//        printf("[%s] Ignoring reportId %d, length %d\n", classIdentifier(), reportId, reportLength);
-//        printf("[%s] Data (hex): ", classIdentifier());
-//        for (int i = 0; i < reportLength; ++i) {
-//            printf("%02X ", report[i]);
-//        }
-//        printf("\n");
-#endif
         return;
     }
 
@@ -518,6 +607,14 @@ void ProductFCUEfis::didReceiveData(int reportId, uint8_t *report, int reportLen
 
 void ProductFCUEfis::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count) {
     USBDevice::didReceiveButton(hardwareButtonIndex, pressed, count);
+
+    if (!connected || !profile) {
+        return;
+    }
+
+    if (isButtonHandledByXPlane(hardwareButtonIndex)) {
+        return;
+    }
 
     auto &buttons = profile->buttonDefs();
     auto it = buttons.find(hardwareButtonIndex);

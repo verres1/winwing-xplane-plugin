@@ -14,26 +14,30 @@ TolissUrsaMinorThrottleProfile::TolissUrsaMinorThrottleProfile(ProductUrsaMinorT
 
         product->setLedBrightness(UrsaMinorThrottleLed::BACKLIGHT, backlightBrightness);
         product->setLedBrightness(UrsaMinorThrottleLed::OVERALL_LEDS_AND_LCD_BRIGHTNESS, hasPower ? 255 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("sim/cockpit/electrical/avionics_on", [this, product](bool poweredOn) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/PanelBrightnessLevel");
 
         updateDisplays();
         product->forceStateSync();
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("AirbusFBW/YawTrimPosition", [this, product](float trimPosition) {
         updateDisplays();
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<int>("AirbusFBW/AnnunMode", [this, product](int annunMode) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/OHPLightsATA70_Raw");
 
         updateDisplays();
-    });
+    },
+        this);
 
-    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/OHPLightsATA70_Raw", [this, product](std::vector<float> panelLights) {
+    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/OHPLightsATA70_Raw", [this, product](const std::vector<float> &panelLights) {
         if (panelLights.size() < 13) {
             return;
         }
@@ -42,41 +46,12 @@ TolissUrsaMinorThrottleProfile::TolissUrsaMinorThrottleProfile(ProductUrsaMinorT
         product->setLedBrightness(UrsaMinorThrottleLed::ENG_1_FIRE, panelLights[11] > std::numeric_limits<float>::epsilon() || isAnnunTest() ? 1 : 0);
         product->setLedBrightness(UrsaMinorThrottleLed::ENG_2_FAULT, panelLights[12] > std::numeric_limits<float>::epsilon() || isAnnunTest() ? 1 : 0);
         product->setLedBrightness(UrsaMinorThrottleLed::ENG_2_FIRE, panelLights[13] > std::numeric_limits<float>::epsilon() || isAnnunTest() ? 1 : 0);
-    });
-}
-
-TolissUrsaMinorThrottleProfile::~TolissUrsaMinorThrottleProfile() {
-    Dataref::getInstance()->unbind("AirbusFBW/PanelBrightnessLevel");
-    Dataref::getInstance()->unbind("sim/cockpit/electrical/avionics_on");
-    Dataref::getInstance()->unbind("AirbusFBW/AnnunMode");
-    Dataref::getInstance()->unbind("AirbusFBW/YawTrimPosition");
-    Dataref::getInstance()->unbind("AirbusFBW/OHPLightsATA70_Raw");
+    },
+        this);
 }
 
 bool TolissUrsaMinorThrottleProfile::IsEligible() {
     return Dataref::getInstance()->exists("AirbusFBW/PanelBrightnessLevel");
-}
-
-void TolissUrsaMinorThrottleProfile::update() {
-    if (Dataref::getInstance()->getCached<bool>("sim/cockpit/electrical/avionics_on")) {
-        float gForce = Dataref::getInstance()->get<float>("sim/flightmodel/forces/g_nrml");
-        float delta = fabs(gForce - lastGForce);
-        lastGForce = gForce;
-
-        bool onGround = Dataref::getInstance()->getCached<bool>("sim/flightmodel/failures/onground_any");
-        uint8_t vibration = (uint8_t) std::min(255.0f, delta * (onGround ? product->vibrationMultiplier : product->vibrationMultiplier / 2.0f));
-        if (vibration < 6) {
-            vibration = 0;
-        }
-
-        if (lastVibration != vibration) {
-            product->setVibration(vibration);
-            lastVibration = vibration;
-        }
-    } else if (lastVibration > 0) {
-        lastVibration = 0;
-        product->setVibration(lastVibration);
-    }
 }
 
 const std::unordered_map<uint16_t, UrsaMinorThrottleButtonDef> &TolissUrsaMinorThrottleProfile::buttonDefs() const {
@@ -91,7 +66,7 @@ const std::unordered_map<uint16_t, UrsaMinorThrottleButtonDef> &TolissUrsaMinorT
         {7, {"ENG mode NORMAL", "AirbusFBW/ENGModeSwitch", UrsaMinorThrottleDatarefType::SET_VALUE, 1}},
         {8, {"ENG mode START", "AirbusFBW/ENGModeSwitch", UrsaMinorThrottleDatarefType::SET_VALUE, 2}},
         {9, {"AT disconnect Left", "sim/autopilot/autothrottle_off"}},
-        {10, {"AT disconnect Right", ""}}, // We could map to the same as above, but not mapping anything lets the user assign a different command if desired.
+        {10, {"AT disconnect Right", "sim/autopilot/autothrottle_off"}},
         {11, {"TOGA L", ""}},
         {12, {"MCT L", ""}},
         {13, {"CLB L", ""}},
@@ -107,10 +82,10 @@ const std::unordered_map<uint16_t, UrsaMinorThrottleButtonDef> &TolissUrsaMinorT
 
         {23, {"Engine mode selector pushed", ""}},
 
-        {24, {"Rudder trim Reset", "sim/flight_controls/rudder_trim_center"}},
-        {25, {"Rudder trim Nose Left", "sim/flight_controls/rudder_trim_left"}},
+        {24, {"Rudder trim Reset", "sim/flight_controls/rudder_trim_center", UrsaMinorThrottleDatarefType::EXECUTE_CMD_PHASED}},
+        {25, {"Rudder trim Nose Left", "sim/flight_controls/rudder_trim_left", UrsaMinorThrottleDatarefType::EXECUTE_CMD_PHASED}},
         {26, {"Rudder trim Idle", ""}},
-        {27, {"Rudder trim Nose Right", "sim/flight_controls/rudder_trim_right"}},
+        {27, {"Rudder trim Nose Right", "sim/flight_controls/rudder_trim_right", UrsaMinorThrottleDatarefType::EXECUTE_CMD_PHASED}},
 
         {28, {"Park brake OFF", "AirbusFBW/ParkBrake", UrsaMinorThrottleDatarefType::SET_VALUE, 0}},
         {29, {"Park brake ON", "AirbusFBW/ParkBrake", UrsaMinorThrottleDatarefType::SET_VALUE, 1}},
@@ -121,11 +96,10 @@ const std::unordered_map<uint16_t, UrsaMinorThrottleButtonDef> &TolissUrsaMinorT
         {33, {"FLAP 1", "AirbusFBW/FlapLeverRatio", UrsaMinorThrottleDatarefType::SET_VALUE, 0.25}},
         {34, {"FLAP 0", "AirbusFBW/FlapLeverRatio", UrsaMinorThrottleDatarefType::SET_VALUE, 0}},
 
-        {35, {"UNKNOWN 35", ""}},
-        {36, {"UNKNOWN 36", ""}},
-
-        {37, {"Speedbrake disarmed", "sim/cockpit2/controls/speedbrake_ratio", UrsaMinorThrottleDatarefType::SPEEDBRAKE_ARM, 0}},
-        {38, {"Speedbrake armed", "sim/cockpit2/controls/speedbrake_ratio", UrsaMinorThrottleDatarefType::SPEEDBRAKE_ARM, 1}},
+        {35, {"Speedbrake full", ""}},
+        {36, {"Speedbrake half", ""}},
+        {37, {"Speedbrake stowed", ""}},
+        {38, {"Speedbrake armed", "sim/cockpit2/controls/speedbrake_ratio", UrsaMinorThrottleDatarefType::TOLISS_SPEEDBRAKE, -0.5}},
 
         {39, {"Reversers active L", ""}},
         {40, {"Reversers active R", ""}},
@@ -140,18 +114,9 @@ void TolissUrsaMinorThrottleProfile::buttonPressed(const UrsaMinorThrottleButton
     }
 
     auto datarefManager = Dataref::getInstance();
-    if (button->datarefType == UrsaMinorThrottleDatarefType::SPEEDBRAKE_ARM) {
-        if (phase != xplm_CommandBegin) {
-            return;
-        }
-
-        float ratio = datarefManager->get<float>(button->dataref.c_str());
-        if (button->value > std::numeric_limits<double>::epsilon()) {
-            datarefManager->set<float>(button->dataref.c_str(), -0.5f);
-        } else if (ratio <= 0.0f) {
-            datarefManager->set<float>(button->dataref.c_str(), 0.0f);
-        }
-
+    if (button->datarefType == UrsaMinorThrottleDatarefType::TOLISS_SPEEDBRAKE) {
+        bool shouldArm = phase == xplm_CommandBegin;
+        datarefManager->set<float>(button->dataref.c_str(), shouldArm ? static_cast<float>(button->value) : 0.0f);
     } else if (button->datarefType == UrsaMinorThrottleDatarefType::SET_VALUE) {
         if (phase != xplm_CommandBegin) {
             return;
@@ -177,7 +142,7 @@ void TolissUrsaMinorThrottleProfile::updateDisplays() {
     if (isAnnunTest()) {
         newTrimText = "R88.8";
     }
-    
+
     if (newTrimText != trimText) {
         trimText = newTrimText;
         product->setLCDText(trimText);

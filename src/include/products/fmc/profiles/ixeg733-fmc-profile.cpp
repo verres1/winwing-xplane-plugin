@@ -2,7 +2,6 @@
 
 #include "appstate.h"
 #include "dataref.h"
-#include "font.h"
 #include "product-fmc.h"
 
 #include <algorithm>
@@ -13,24 +12,21 @@
 #include <XPLMProcessing.h>
 #include <XPLMUtilities.h>
 
-IXEG733FMCProfile::IXEG733FMCProfile(ProductFMC *product) :
-    FMCAircraftProfile(product) {
+IXEG733FMCProfile::IXEG733FMCProfile(ProductFMC *product) : FMCAircraftProfile(product) {
     product->setAllLedsEnabled(false);
-    product->setFont(Font::GlyphData(FontVariant::Font737, product->identifierByte));
+    product->setFont(FontVariant::Font737);
+
     Dataref::getInstance()->monitorExistingDataref<float>("ixeg/733/rheostats/light_fmc_pt_act", [product](float brightness) {
         uint8_t target = Dataref::getInstance()->get<bool>("sim/cockpit/electrical/avionics_on") ? brightness * 255 : 0;
         product->setLedBrightness(FMCLed::BACKLIGHT, target);
         product->setLedBrightness(FMCLed::SCREEN_BACKLIGHT, target);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("sim/cockpit/electrical/avionics_on", [](bool poweredOn) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("ixeg/733/rheostats/light_fmc_pt_act");
-    });
-}
-
-IXEG733FMCProfile::~IXEG733FMCProfile() {
-    Dataref::getInstance()->unbind("ixeg/733/rheostats/light_fmc_pt_act");
-    Dataref::getInstance()->unbind("sim/cockpit/electrical/avionics_on");
+    },
+        this);
 }
 
 bool IXEG733FMCProfile::IsEligible() {
@@ -79,77 +75,77 @@ const std::vector<FMCButtonDef> &IXEG733FMCProfile::buttonDefs() const {
 
     return cache.try_emplace(product->deviceVariant,
                     std::vector<FMCButtonDef>{
-                        {FMCKey::LSK1L, "ixeg/733/FMC/" + cdu + "_lsk_1L"},
-                        {FMCKey::LSK2L, "ixeg/733/FMC/" + cdu + "_lsk_2L"},
-                        {FMCKey::LSK3L, "ixeg/733/FMC/" + cdu + "_lsk_3L"},
-                        {FMCKey::LSK4L, "ixeg/733/FMC/" + cdu + "_lsk_4L"},
-                        {FMCKey::LSK5L, "ixeg/733/FMC/" + cdu + "_lsk_5L"},
-                        {FMCKey::LSK6L, "ixeg/733/FMC/" + cdu + "_lsk_6L"},
-                        {FMCKey::LSK1R, "ixeg/733/FMC/" + cdu + "_lsk_1R"},
-                        {FMCKey::LSK2R, "ixeg/733/FMC/" + cdu + "_lsk_2R"},
-                        {FMCKey::LSK3R, "ixeg/733/FMC/" + cdu + "_lsk_3R"},
-                        {FMCKey::LSK4R, "ixeg/733/FMC/" + cdu + "_lsk_4R"},
-                        {FMCKey::LSK5R, "ixeg/733/FMC/" + cdu + "_lsk_5R"},
-                        {FMCKey::LSK6R, "ixeg/733/FMC/" + cdu + "_lsk_6R"},
-                        {std::vector<FMCKey>{FMCKey::PFP_INIT_REF, FMCKey::MCDU_INIT}, "ixeg/733/FMC/" + cdu + "_initref"},
-                        {std::vector<FMCKey>{FMCKey::PFP_ROUTE, FMCKey::MCDU_SEC_FPLN}, "ixeg/733/FMC/" + cdu + "_rte"},
-                        {FMCKey::PFP3_CLB, "ixeg/733/FMC/" + cdu + "_clb"},
-                        {FMCKey::PFP3_CRZ, "ixeg/733/FMC/" + cdu + "_crz"},
-                        {FMCKey::PFP3_DES, "ixeg/733/FMC/" + cdu + "_des"},
-                        {FMCKey::BRIGHTNESS_DOWN, "ixeg/733/rheostats/light_fmc_pt_act", -0.1},
-                        {FMCKey::BRIGHTNESS_UP, "ixeg/733/rheostats/light_fmc_pt_act", 0.1},
-                        {FMCKey::MENU, "ixeg/733/FMC/" + cdu + "_menu"},
-                        {std::vector<FMCKey>{FMCKey::PFP_LEGS, FMCKey::MCDU_FPLN, FMCKey::MCDU_DIR}, "ixeg/733/FMC/" + cdu + "_legs"},
-                        {std::vector<FMCKey>{FMCKey::PFP_DEP_ARR, FMCKey::MCDU_AIRPORT}, "ixeg/733/FMC/" + cdu + "_deparr"},
-                        {FMCKey::PFP_HOLD, "ixeg/733/FMC/" + cdu + "_hold"},
-                        {FMCKey::PROG, "ixeg/733/FMC/" + cdu + "_prog"},
-                        {std::vector<FMCKey>{FMCKey::PFP_EXEC, FMCKey::MCDU_EMPTY_TOP_RIGHT}, "ixeg/733/FMC/" + cdu + "_exec"},
-                        {std::vector<FMCKey>{FMCKey::PFP3_N1_LIMIT, FMCKey::MCDU_PERF}, "ixeg/733/FMC/" + cdu + "_n1limit"},
-                        {std::vector<FMCKey>{FMCKey::PFP_FIX, FMCKey::MCDU_EMPTY_BOTTOM_LEFT}, "ixeg/733/FMC/" + cdu + "_fix"},
-                        {FMCKey::PAGE_PREV, "ixeg/733/FMC/" + cdu + "_prev"},
-                        {FMCKey::PAGE_NEXT, "ixeg/733/FMC/" + cdu + "_next"},
-                        {FMCKey::KEY1, "ixeg/733/FMC/" + cdu + "_1"},
-                        {FMCKey::KEY2, "ixeg/733/FMC/" + cdu + "_2"},
-                        {FMCKey::KEY3, "ixeg/733/FMC/" + cdu + "_3"},
-                        {FMCKey::KEY4, "ixeg/733/FMC/" + cdu + "_4"},
-                        {FMCKey::KEY5, "ixeg/733/FMC/" + cdu + "_5"},
-                        {FMCKey::KEY6, "ixeg/733/FMC/" + cdu + "_6"},
-                        {FMCKey::KEY7, "ixeg/733/FMC/" + cdu + "_7"},
-                        {FMCKey::KEY8, "ixeg/733/FMC/" + cdu + "_8"},
-                        {FMCKey::KEY9, "ixeg/733/FMC/" + cdu + "_9"},
-                        {FMCKey::PERIOD, "ixeg/733/FMC/" + cdu + "_dot"},
-                        {FMCKey::KEY0, "ixeg/733/FMC/" + cdu + "_0"},
-                        {FMCKey::PLUSMINUS, "ixeg/733/FMC/" + cdu + "_plus"},
-                        {FMCKey::KEYA, "ixeg/733/FMC/" + cdu + "_A"},
-                        {FMCKey::KEYB, "ixeg/733/FMC/" + cdu + "_B"},
-                        {FMCKey::KEYC, "ixeg/733/FMC/" + cdu + "_C"},
-                        {FMCKey::KEYD, "ixeg/733/FMC/" + cdu + "_D"},
-                        {FMCKey::KEYE, "ixeg/733/FMC/" + cdu + "_E"},
-                        {FMCKey::KEYF, "ixeg/733/FMC/" + cdu + "_F"},
-                        {FMCKey::KEYG, "ixeg/733/FMC/" + cdu + "_G"},
-                        {FMCKey::KEYH, "ixeg/733/FMC/" + cdu + "_H"},
-                        {FMCKey::KEYI, "ixeg/733/FMC/" + cdu + "_I"},
-                        {FMCKey::KEYJ, "ixeg/733/FMC/" + cdu + "_J"},
-                        {FMCKey::KEYK, "ixeg/733/FMC/" + cdu + "_K"},
-                        {FMCKey::KEYL, "ixeg/733/FMC/" + cdu + "_L"},
-                        {FMCKey::KEYM, "ixeg/733/FMC/" + cdu + "_M"},
-                        {FMCKey::KEYN, "ixeg/733/FMC/" + cdu + "_N"},
-                        {FMCKey::KEYO, "ixeg/733/FMC/" + cdu + "_O"},
-                        {FMCKey::KEYP, "ixeg/733/FMC/" + cdu + "_P"},
-                        {FMCKey::KEYQ, "ixeg/733/FMC/" + cdu + "_Q"},
-                        {FMCKey::KEYR, "ixeg/733/FMC/" + cdu + "_R"},
-                        {FMCKey::KEYS, "ixeg/733/FMC/" + cdu + "_S"},
-                        {FMCKey::KEYT, "ixeg/733/FMC/" + cdu + "_T"},
-                        {FMCKey::KEYU, "ixeg/733/FMC/" + cdu + "_U"},
-                        {FMCKey::KEYV, "ixeg/733/FMC/" + cdu + "_V"},
-                        {FMCKey::KEYW, "ixeg/733/FMC/" + cdu + "_W"},
-                        {FMCKey::KEYX, "ixeg/733/FMC/" + cdu + "_X"},
-                        {FMCKey::KEYY, "ixeg/733/FMC/" + cdu + "_Y"},
-                        {FMCKey::KEYZ, "ixeg/733/FMC/" + cdu + "_Z"},
-                        {FMCKey::SPACE, "ixeg/733/FMC/" + cdu + "_sp"},
-                        {std::vector<FMCKey>{FMCKey::PFP_DEL, FMCKey::MCDU_OVERFLY}, "ixeg/733/FMC/" + cdu + "_del"},
-                        {FMCKey::SLASH, "ixeg/733/FMC/" + cdu + "_slash"},
-                        {FMCKey::CLR, "ixeg/733/FMC/" + cdu + "_clr"}})
+                        {FMCKey::LSK1L, "ixeg/733/FMC/" + cdu + "_lsk_1L", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK2L, "ixeg/733/FMC/" + cdu + "_lsk_2L", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK3L, "ixeg/733/FMC/" + cdu + "_lsk_3L", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK4L, "ixeg/733/FMC/" + cdu + "_lsk_4L", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK5L, "ixeg/733/FMC/" + cdu + "_lsk_5L", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK6L, "ixeg/733/FMC/" + cdu + "_lsk_6L", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK1R, "ixeg/733/FMC/" + cdu + "_lsk_1R", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK2R, "ixeg/733/FMC/" + cdu + "_lsk_2R", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK3R, "ixeg/733/FMC/" + cdu + "_lsk_3R", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK4R, "ixeg/733/FMC/" + cdu + "_lsk_4R", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK5R, "ixeg/733/FMC/" + cdu + "_lsk_5R", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK6R, "ixeg/733/FMC/" + cdu + "_lsk_6R", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_INIT_REF, FMCKey::MCDU_INIT}, "ixeg/733/FMC/" + cdu + "_initref", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_ROUTE, FMCKey::MCDU_SEC_FPLN}, "ixeg/733/FMC/" + cdu + "_rte", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PFP3_CLB, "ixeg/733/FMC/" + cdu + "_clb", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PFP3_CRZ, "ixeg/733/FMC/" + cdu + "_crz", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PFP3_DES, "ixeg/733/FMC/" + cdu + "_des", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::BRIGHTNESS_DOWN, "ixeg/733/rheostats/light_fmc_pt_act", FMCDatarefType::ADJUST_VALUE, -0.1},
+                        {FMCKey::BRIGHTNESS_UP, "ixeg/733/rheostats/light_fmc_pt_act", FMCDatarefType::ADJUST_VALUE, 0.1},
+                        {FMCKey::MENU, "ixeg/733/FMC/" + cdu + "_menu", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_LEGS, FMCKey::MCDU_FPLN, FMCKey::MCDU_DIR}, "ixeg/733/FMC/" + cdu + "_legs", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_DEP_ARR, FMCKey::MCDU_AIRPORT}, "ixeg/733/FMC/" + cdu + "_deparr", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PFP_HOLD, "ixeg/733/FMC/" + cdu + "_hold", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PROG, "ixeg/733/FMC/" + cdu + "_prog", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_EXEC, FMCKey::MCDU_EMPTY_TOP_RIGHT}, "ixeg/733/FMC/" + cdu + "_exec", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP3_N1_LIMIT, FMCKey::MCDU_PERF}, "ixeg/733/FMC/" + cdu + "_n1limit", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_FIX, FMCKey::MCDU_EMPTY_BOTTOM_LEFT}, "ixeg/733/FMC/" + cdu + "_fix", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PAGE_PREV, "ixeg/733/FMC/" + cdu + "_prev", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PAGE_NEXT, "ixeg/733/FMC/" + cdu + "_next", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY1, "ixeg/733/FMC/" + cdu + "_1", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY2, "ixeg/733/FMC/" + cdu + "_2", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY3, "ixeg/733/FMC/" + cdu + "_3", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY4, "ixeg/733/FMC/" + cdu + "_4", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY5, "ixeg/733/FMC/" + cdu + "_5", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY6, "ixeg/733/FMC/" + cdu + "_6", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY7, "ixeg/733/FMC/" + cdu + "_7", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY8, "ixeg/733/FMC/" + cdu + "_8", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY9, "ixeg/733/FMC/" + cdu + "_9", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PERIOD, "ixeg/733/FMC/" + cdu + "_dot", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY0, "ixeg/733/FMC/" + cdu + "_0", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PLUSMINUS, "ixeg/733/FMC/" + cdu + "_plus", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYA, "ixeg/733/FMC/" + cdu + "_A", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYB, "ixeg/733/FMC/" + cdu + "_B", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYC, "ixeg/733/FMC/" + cdu + "_C", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYD, "ixeg/733/FMC/" + cdu + "_D", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYE, "ixeg/733/FMC/" + cdu + "_E", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYF, "ixeg/733/FMC/" + cdu + "_F", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYG, "ixeg/733/FMC/" + cdu + "_G", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYH, "ixeg/733/FMC/" + cdu + "_H", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYI, "ixeg/733/FMC/" + cdu + "_I", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYJ, "ixeg/733/FMC/" + cdu + "_J", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYK, "ixeg/733/FMC/" + cdu + "_K", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYL, "ixeg/733/FMC/" + cdu + "_L", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYM, "ixeg/733/FMC/" + cdu + "_M", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYN, "ixeg/733/FMC/" + cdu + "_N", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYO, "ixeg/733/FMC/" + cdu + "_O", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYP, "ixeg/733/FMC/" + cdu + "_P", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYQ, "ixeg/733/FMC/" + cdu + "_Q", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYR, "ixeg/733/FMC/" + cdu + "_R", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYS, "ixeg/733/FMC/" + cdu + "_S", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYT, "ixeg/733/FMC/" + cdu + "_T", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYU, "ixeg/733/FMC/" + cdu + "_U", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYV, "ixeg/733/FMC/" + cdu + "_V", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYW, "ixeg/733/FMC/" + cdu + "_W", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYX, "ixeg/733/FMC/" + cdu + "_X", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYY, "ixeg/733/FMC/" + cdu + "_Y", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYZ, "ixeg/733/FMC/" + cdu + "_Z", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::SPACE, "ixeg/733/FMC/" + cdu + "_sp", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_DEL, FMCKey::MCDU_OVERFLY}, "ixeg/733/FMC/" + cdu + "_del", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::SLASH, "ixeg/733/FMC/" + cdu + "_slash", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::CLR, "ixeg/733/FMC/" + cdu + "_clr", FMCDatarefType::EXECUTE_CMD_PHASED}})
         .first->second;
 }
 
@@ -183,7 +179,7 @@ const std::map<char, FMCTextColor> &IXEG733FMCProfile::colorMap() const {
         {'W', FMCTextColor::COLOR_WHITE},
         {'G', FMCTextColor::COLOR_GREEN}, // Green text
         {'S', FMCTextColor::COLOR_GREEN}, // Green text (Small)
-        {'I', FMCTextColor::COLOR_GREEN_BG},
+        {'I', FMCTextColor::withBackgroundColor(FMCTextColor::COLOR_WHITE, FMCTextColor::COLOR_GREEN)},
     };
     return colMap;
 }
@@ -295,7 +291,9 @@ void IXEG733FMCProfile::updatePage(std::vector<std::vector<char>> &page) {
             continue;
         }
 
-        if (ref.find("D_line") == 0) {
+        // The refs are full paths ("ixeg/733/FMC/cdu1_D_line1L_d"), so match
+        // anywhere in the string; a position-0 match never occurs.
+        if (ref.find("D_line") != std::string::npos) {
             size_t linePos = ref.find("line") + 4;
             if (linePos + 2 < ref.length()) {
                 char lineChar = ref[linePos];
@@ -332,23 +330,35 @@ void IXEG733FMCProfile::updatePage(std::vector<std::vector<char>> &page) {
 }
 
 void IXEG733FMCProfile::buttonPressed(const FMCButtonDef *button, XPLMCommandPhase phase) {
-    if (phase == xplm_CommandContinue) {
+    if (!button || button->dataref.empty() || phase == xplm_CommandContinue) {
         return;
     }
 
-    if (std::holds_alternative<FMCKey>(button->key) &&
-        std::get<FMCKey>(button->key) == FMCKey::CLR) {
-        Dataref::getInstance()->executeCommand(button->dataref.c_str(), phase);
-    } else {
-        if (std::fabs(button->value) > std::numeric_limits<double>::epsilon()) {
-            if (phase != xplm_CommandBegin) {
-                return;
-            }
-
-            float currentValue = Dataref::getInstance()->get<float>(button->dataref.c_str());
-            Dataref::getInstance()->set<float>(button->dataref.c_str(), std::clamp(currentValue + button->value, 0.0, 1.0));
-        } else {
-            Dataref::getInstance()->set<int>(button->dataref.c_str(), phase == xplm_CommandBegin ? 1 : 0);
+    auto datarefManager = Dataref::getInstance();
+    if (button->datarefType == FMCDatarefType::SET_VALUE || button->datarefType == FMCDatarefType::SET_VALUE_PHASED) {
+        double value = std::fabs(button->value) < std::numeric_limits<double>::epsilon() ? 1.0 : button->value;
+        if (button->datarefType == FMCDatarefType::SET_VALUE && phase != xplm_CommandBegin) {
+            return;
         }
+
+        datarefManager->set<double>(button->dataref.c_str(), phase == xplm_CommandBegin ? value : 0.0);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::ADJUST_VALUE) {
+        double currentValue = datarefManager->get<double>(button->dataref.c_str());
+        datarefManager->set<double>(button->dataref.c_str(), currentValue + button->value);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_MULTIPLE_CMD_ONCE) {
+        std::stringstream ss(button->dataref);
+        std::string item;
+        std::vector<std::string> commands;
+        while (std::getline(ss, item, ',')) {
+            commands.push_back(item);
+        }
+
+        for (const auto &cmd : commands) {
+            datarefManager->executeCommand(cmd.c_str());
+        }
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_CMD_ONCE) {
+        datarefManager->executeCommand(button->dataref.c_str());
+    } else {
+        datarefManager->executeCommand(button->dataref.c_str(), phase);
     }
 }

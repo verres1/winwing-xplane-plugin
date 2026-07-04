@@ -9,9 +9,18 @@
 #include <XPLMUtilities.h>
 
 USBDevice::USBDevice(HIDDeviceHandle aHidDevice, uint16_t aVendorId, uint16_t aProductId, std::string aVendorName, std::string aProductName) :
-    hidDevice(aHidDevice), vendorId(aVendorId), productId(aProductId), vendorName(aVendorName), productName(aProductName), connected(false) {}
+    hidDevice(aHidDevice), vendorId(aVendorId), productId(aProductId), vendorName(aVendorName), productName(aProductName), connected(false) {
+    // The HID manager owns the ref it handed us and is free to release it the
+    // moment the device is unplugged; retain it for this object's lifetime.
+    if (hidDevice) {
+        CFRetain(hidDevice);
+    }
+}
 
 USBDevice::~USBDevice() {
+    // Device destructor calls cancelTasksForOwner as a fallback in case a
+    // derived product class forgot. Profile destructors call cleanupProfile.
+    AppState::getInstance()->cancelTasksForOwner(this);
     disconnect();
 }
 
@@ -26,8 +35,11 @@ bool USBDevice::connect() {
             throw std::system_error(std::make_error_code(std::errc::io_error), std::string("IOHIDDeviceOpen failed: ") + std::to_string(result));
         }
     } catch (const std::exception &ex) {
-        debug("Failed to open HID device: %s\nError: %s\n", productName.c_str(), ex.what());
-        hidDevice = nullptr;
+        Logger::getInstance()->debug("Failed to open HID device: %s\nError: %s\n", productName.c_str(), ex.what());
+        if (hidDevice) {
+            CFRelease(hidDevice);
+            hidDevice = nullptr;
+        }
         return false;
     }
 
@@ -35,14 +47,16 @@ bool USBDevice::connect() {
         hidQueue = IOHIDQueueCreate(kCFAllocatorDefault, hidDevice, kInputReportSize, 0);
 
         CFArrayRef elements = IOHIDDeviceCopyMatchingElements(hidDevice, nullptr, kIOHIDOptionsTypeNone);
-        CFIndex count = CFArrayGetCount(elements);
-        for (CFIndex i = 0; i < count; i++) {
-            IOHIDElementRef elem = (IOHIDElementRef) CFArrayGetValueAtIndex(elements, i);
-            if (IOHIDElementGetType(elem) == kIOHIDElementTypeInput_Button) {
-                IOHIDQueueAddElement(hidQueue, elem);
+        if (elements) {
+            CFIndex count = CFArrayGetCount(elements);
+            for (CFIndex i = 0; i < count; i++) {
+                IOHIDElementRef elem = (IOHIDElementRef) CFArrayGetValueAtIndex(elements, i);
+                if (IOHIDElementGetType(elem) == kIOHIDElementTypeInput_Button) {
+                    IOHIDQueueAddElement(hidQueue, elem);
+                }
             }
+            CFRelease(elements);
         }
-        CFRelease(elements);
 
         IOHIDQueueScheduleWithRunLoop(hidQueue, CFRunLoopGetCurrent(), kCFRunLoopCommonModes);
         IOHIDQueueStart(hidQueue);
@@ -73,6 +87,7 @@ void USBDevice::update() {
 }
 
 void USBDevice::disconnect() {
+    // Wait for write queue to drain before disconnecting
     while (writeQueueSize.load() > 0 && writeThreadRunning) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -80,21 +95,22 @@ void USBDevice::disconnect() {
     connected = false;
     writeThreadRunning = false;
     writeQueueCV.notify_all();
-
     if (writeThread.joinable()) {
         writeThread.join();
     }
 
-    if (hidDevice) {
+    if (hidQueue) {
         IOHIDQueueStop(hidQueue);
         IOHIDQueueUnscheduleFromRunLoop(hidQueue, CFRunLoopGetCurrent(), kCFRunLoopCommonModes);
+        CFRelease(hidQueue);
         hidQueue = nullptr;
+    }
 
-        for (int i = 0; i < 10; i++) {
-            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.001, true);
+    if (hidDevice) {
+        if (!deviceRemoved) {
+            IOHIDDeviceClose(hidDevice, kIOHIDOptionsTypeNone);
         }
-
-        IOHIDDeviceClose(hidDevice, kIOHIDOptionsTypeNone);
+        CFRelease(hidDevice);
         hidDevice = nullptr;
     }
 }
@@ -105,6 +121,10 @@ void USBDevice::forceStateSync() {
     }
 
     CFArrayRef elements = IOHIDDeviceCopyMatchingElements(hidDevice, nullptr, 0);
+    if (!elements) {
+        return;
+    }
+
     for (CFIndex i = 0; i < CFArrayGetCount(elements); i++) {
         IOHIDElementRef element = (IOHIDElementRef) CFArrayGetValueAtIndex(elements, i);
         if (IOHIDElementGetType(element) != kIOHIDElementTypeInput_Button) {
@@ -122,7 +142,6 @@ void USBDevice::forceStateSync() {
 
 bool USBDevice::writeData(std::vector<uint8_t> data) {
     if (!hidDevice || !connected || data.empty()) {
-        debug("HID device not open, not connected, or empty data\n");
         return false;
     }
 
@@ -131,6 +150,7 @@ bool USBDevice::writeData(std::vector<uint8_t> data) {
         if (!connected || !writeThreadRunning) {
             return false;
         }
+
         writeQueue.push(std::move(data));
         writeQueueSize.store(writeQueue.size());
     }
@@ -162,7 +182,7 @@ void USBDevice::writeThreadLoop() {
             uint8_t reportID = data[0];
             IOReturn kr = IOHIDDeviceSetReport(hidDevice, kIOHIDReportTypeOutput, reportID, data.data(), data.size());
             if (kr != kIOReturnSuccess) {
-                debug("IOHIDDeviceSetReport failed: %d\n", kr);
+                Logger::getInstance()->debug("IOHIDDeviceSetReport failed: %d\n", kr);
             }
         }
     }

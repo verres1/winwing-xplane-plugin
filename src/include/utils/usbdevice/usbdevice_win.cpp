@@ -15,10 +15,18 @@ extern "C" {
 #include <hidpi.h>
 }
 
+std::string USBDevice::pendingDevicePath;
+
 USBDevice::USBDevice(HIDDeviceHandle aHidDevice, uint16_t aVendorId, uint16_t aProductId, std::string aVendorName, std::string aProductName) :
-    hidDevice(aHidDevice), vendorId(aVendorId), productId(aProductId), vendorName(aVendorName), productName(aProductName), connected(false) {}
+    hidDevice(aHidDevice), vendorId(aVendorId), productId(aProductId), vendorName(aVendorName), productName(aProductName), connected(false) {
+    devicePath = pendingDevicePath;
+    pendingDevicePath.clear();
+}
 
 USBDevice::~USBDevice() {
+    // Device destructor calls cancelTasksForOwner as a fallback in case a
+    // derived product class forgot. Profile destructors call cleanupProfile.
+    AppState::getInstance()->cancelTasksForOwner(this);
     disconnect();
 }
 
@@ -35,28 +43,47 @@ bool USBDevice::connect() {
         HIDP_CAPS caps;
         if (HidP_GetCaps(preparsedData, &caps) == HIDP_STATUS_SUCCESS) {
             outputReportByteLength = caps.OutputReportByteLength;
-            debug("Output report byte length: %u\n", outputReportByteLength);
+            Logger::getInstance()->debug("Output report byte length: %u\n", outputReportByteLength);
         } else {
-            debug_force("Failed to get HID capabilities\n");
+            Logger::getInstance()->error("Failed to get HID capabilities\n");
         }
         HidD_FreePreparsedData(preparsedData);
     } else {
-        debug_force("Failed to get preparsed data\n");
+        Logger::getInstance()->error("Failed to get preparsed data\n");
+    }
+
+    if (hidWriteDevice != INVALID_HANDLE_VALUE) {
+        CloseHandle(hidWriteDevice);
+        hidWriteDevice = INVALID_HANDLE_VALUE;
+    }
+    if (!devicePath.empty()) {
+        hidWriteDevice = CreateFileA(devicePath.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+    }
+    if (hidWriteDevice == INVALID_HANDLE_VALUE) {
+        // Writes fall back to the shared handle, where they serialize against
+        // the blocking ReadFile and throttle to the device's input report rate.
+        Logger::getInstance()->error("Failed to open dedicated write handle for %s, falling back to shared handle: %lu\n",
+            productName.empty() ? "Unknown" : productName.c_str(), GetLastError());
     }
 
     connected = true;
-    inputThreadRunning = true;
     inputThread = std::thread([this]() {
+        HANDLE selfHandle = nullptr;
+        DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &selfHandle, 0, FALSE, DUPLICATE_SAME_ACCESS);
+        inputThreadHandle = selfHandle;
+
         uint8_t buffer[65];
         DWORD bytesRead;
-        while (inputThreadRunning && connected && hidDevice != INVALID_HANDLE_VALUE) {
+        while (connected && hidDevice != INVALID_HANDLE_VALUE) {
             BOOL result = ReadFile(hidDevice, buffer, sizeof(buffer), &bytesRead, nullptr);
 
             if (result && bytesRead > 0 && connected) {
                 InputReportCallback(this, bytesRead, buffer);
             } else if (!result) {
                 DWORD error = GetLastError();
-                if (error == ERROR_DEVICE_NOT_CONNECTED) {
+                if (error == ERROR_DEVICE_NOT_CONNECTED ||
+                    error == ERROR_OPERATION_ABORTED ||
+                    error == ERROR_INVALID_HANDLE) {
                     break;
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -90,7 +117,7 @@ void USBDevice::InputReportCallback(void *context, DWORD bytesRead, uint8_t *rep
     } catch (const std::system_error &e) {
         return;
     } catch (...) {
-        debug_force("Unexpected exception in InputReportCallback\n");
+        Logger::getInstance()->error("Unexpected exception in InputReportCallback\n");
         return;
     }
 }
@@ -104,28 +131,51 @@ void USBDevice::update() {
 }
 
 void USBDevice::disconnect() {
+    // Drain the write queue first, while connected is still true: writeThreadLoop
+    // only performs the actual write when connected is set, so flipping it before
+    // draining would silently discard any final commands (e.g. blackout()) that
+    // were just queued.
     while (writeQueueSize.load() > 0 && writeThreadRunning) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     connected = false;
-    inputThreadRunning = false;
+
     writeThreadRunning = false;
     writeQueueCV.notify_all();
+    if (writeThread.joinable()) {
+        writeThread.join();
+    }
 
-    if (hidDevice != INVALID_HANDLE_VALUE) {
-        CancelIoEx(hidDevice, nullptr);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        CloseHandle(hidDevice);
-        hidDevice = INVALID_HANDLE_VALUE;
+    if (hidWriteDevice != INVALID_HANDLE_VALUE) {
+        CloseHandle(hidWriteDevice);
+        hidWriteDevice = INVALID_HANDLE_VALUE;
     }
 
     if (inputThread.joinable()) {
+        // CancelIoEx only cancels a ReadFile that is already pending; the
+        // input thread may be between its loop condition and the next read,
+        // which would then block forever on a quiescent device. Keep
+        // cancelling until the thread has actually exited. A null handle
+        // means the thread has not reached its first statement yet; it will
+        // then see connected == false and exit before reading.
+        HANDLE threadHandle = inputThreadHandle.load();
+        while (threadHandle && WaitForSingleObject(threadHandle, 50) == WAIT_TIMEOUT) {
+            if (hidDevice != INVALID_HANDLE_VALUE) {
+                CancelIoEx(hidDevice, nullptr);
+            }
+            CancelSynchronousIo(threadHandle);
+        }
         inputThread.join();
+        if (threadHandle) {
+            CloseHandle(threadHandle);
+        }
+        inputThreadHandle = nullptr;
     }
 
-    if (writeThread.joinable()) {
-        writeThread.join();
+    if (hidDevice != INVALID_HANDLE_VALUE) {
+        CloseHandle(hidDevice);
+        hidDevice = INVALID_HANDLE_VALUE;
     }
 
     if (inputBuffer) {
@@ -140,12 +190,11 @@ void USBDevice::forceStateSync() {
 
 bool USBDevice::writeData(std::vector<uint8_t> data) {
     if (hidDevice == INVALID_HANDLE_VALUE || !connected || data.empty()) {
-        debug_force("HID device not open, not connected, or empty data\n");
         return false;
     }
 
     if (data.size() > 1024) {
-        debug_force("Data size too large: %zu bytes\n", data.size());
+        Logger::getInstance()->error("Data size too large: %zu bytes\n", data.size());
         return false;
     }
 
@@ -181,13 +230,14 @@ void USBDevice::writeThreadLoop() {
         }
 
         if (!data.empty() && hidDevice != INVALID_HANDLE_VALUE && connected) {
+            HANDLE writeHandle = hidWriteDevice != INVALID_HANDLE_VALUE ? hidWriteDevice : hidDevice;
             std::vector<uint8_t> paddedData = data;
             if (outputReportByteLength > 0 && paddedData.size() < outputReportByteLength) {
                 paddedData.resize(outputReportByteLength, 0);
             }
 
             DWORD bytesWritten;
-            if (!WriteFile(hidDevice, paddedData.data(), (DWORD) paddedData.size(), &bytesWritten, nullptr)) {
+            if (!WriteFile(writeHandle, paddedData.data(), (DWORD) paddedData.size(), &bytesWritten, nullptr)) {
                 DWORD error = GetLastError();
                 const char *errorName = "UNKNOWN";
                 if (error == ERROR_DEVICE_NOT_CONNECTED) {
@@ -197,7 +247,7 @@ void USBDevice::writeThreadLoop() {
                 } else if (error == ERROR_IO_DEVICE) {
                     errorName = "IO_DEVICE";
                 }
-                debug_force("WriteFile failed for %s (vendorId: 0x%04X, productId: 0x%04X): %lu (%s)\n",
+                Logger::getInstance()->error("WriteFile failed for %s (vendorId: 0x%04X, productId: 0x%04X): %lu (%s)\n",
                     productName.empty() ? "Unknown" : productName.c_str(), vendorId, productId, error, errorName);
             }
         }

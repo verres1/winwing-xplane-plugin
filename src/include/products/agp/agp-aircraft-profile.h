@@ -1,6 +1,8 @@
 #ifndef AGP_AIRCRAFT_PROFILE_H
 #define AGP_AIRCRAFT_PROFILE_H
 
+#include "profile-cleanup.h"
+
 #include <string>
 #include <unordered_map>
 #include <XPLMUtilities.h>
@@ -8,7 +10,7 @@
 class ProductAGP;
 
 enum class AGPDatarefType : unsigned char {
-    EXECUTE_CMD_ONCE = 1,
+    EXECUTE_CMD_PHASED = 1,
     SET_VALUE,
     TERRAIN_ON_ND,
     LANDING_GEAR
@@ -17,7 +19,7 @@ enum class AGPDatarefType : unsigned char {
 struct AGPButtonDef {
         std::string name;
         std::string dataref;
-        AGPDatarefType datarefType = AGPDatarefType::EXECUTE_CMD_ONCE;
+        AGPDatarefType datarefType = AGPDatarefType::EXECUTE_CMD_PHASED;
         double value = 0.0;
 };
 
@@ -27,7 +29,10 @@ class AGPAircraftProfile {
 
     public:
         AGPAircraftProfile(ProductAGP *product) : product(product) {};
-        virtual ~AGPAircraftProfile() = default;
+
+        virtual ~AGPAircraftProfile() {
+            cleanupProfile(this);
+        }
 
         virtual const std::unordered_map<uint16_t, AGPButtonDef> &buttonDefs() const = 0;
         virtual void buttonPressed(const AGPButtonDef *button, XPLMCommandPhase phase) = 0;

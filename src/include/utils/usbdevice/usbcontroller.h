@@ -3,8 +3,12 @@
 
 #include "usbdevice.h"
 
+#include <atomic>
+#include <condition_variable>
 #include <functional>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #if APL
@@ -29,13 +33,25 @@ typedef int HIDDeviceHandle;
 class USBController {
     private:
         HIDManagerHandle hidManager;
-        bool shouldShutdown = false;
+        std::atomic<bool> shouldShutdown{false};
+
+        // Guards devices (and the per-platform path/pending tracking) against
+        // monitor-thread reads racing flight-loop mutation on Windows/Linux.
+        std::mutex devicesMutex;
+
+#if IBM || LIN
+        std::thread monitorThread;
+#endif
+#if IBM
+        std::mutex monitorMutex;
+        std::condition_variable monitorCV;
+#endif
 
         USBController();
-        ~USBController();
         static USBController *instance;
 
         void enumerateDevices();
+        void forgetDevice(USBDevice *device);
 
 #if APL
         static void DeviceAddedCallback(void *context, IOReturn result, void *sender, IOHIDDeviceRef device);
@@ -59,6 +75,8 @@ class USBController {
 #endif
 
     public:
+        ~USBController();
+
         std::vector<USBDevice *> devices;
         static USBController *getInstance();
         void destroy();

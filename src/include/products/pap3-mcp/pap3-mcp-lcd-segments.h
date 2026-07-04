@@ -71,12 +71,18 @@ namespace pap3mcp::lcd {
     inline constexpr uint8_t OFF_38 = 0x38;
 
     // Dots
-    inline constexpr uint8_t DOT_SPD = 0x04;
+    inline constexpr uint8_t DOT_SPD = 0x04; // Decimal point between HUNDREDS and TENS
     inline constexpr uint8_t DOT_CPT_CRS = 0x20;
     inline constexpr uint8_t DOT_HDG = 0x08;
     inline constexpr uint8_t DOT_ALT = 0x01;
     inline constexpr uint8_t DOT_VSPD = 0x04;
     inline constexpr uint8_t DOT_FO_CRS = 0x10;
+
+    // SPD colon (between KILO and HUNDREDS digits). Physically the same bits as
+    // the "SPD bars" below; the lower dot doubles as the MACH decimal point.
+    // Confirmed by segment probe: lower dot lives in byte OFF_1E, upper in OFF_22.
+    inline constexpr uint8_t DOT_SPD_COLON_LOWER = 0x80; // at OFF_1E
+    inline constexpr uint8_t DOT_SPD_COLON_UPPER = 0x80; // at OFF_22
 
     // SPD bars
     inline constexpr uint8_t SPD_BAR_BOTTOM = 0x80;

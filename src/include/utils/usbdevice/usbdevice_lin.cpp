@@ -11,6 +11,7 @@
 #include <iostream>
 #include <linux/hidraw.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 #include <thread>
 #include <unistd.h>
 #include <XPLMUtilities.h>
@@ -19,6 +20,9 @@ USBDevice::USBDevice(HIDDeviceHandle aHidDevice, uint16_t aVendorId, uint16_t aP
     hidDevice(aHidDevice), vendorId(aVendorId), productId(aProductId), vendorName(aVendorName), productName(aProductName), connected(false) {}
 
 USBDevice::~USBDevice() {
+    // Device destructor calls cancelTasksForOwner as a fallback in case a
+    // derived product class forgot. Profile destructors call cleanupProfile.
+    AppState::getInstance()->cancelTasksForOwner(this);
     disconnect();
 }
 
@@ -30,22 +34,56 @@ bool USBDevice::connect() {
     }
     inputBuffer = new uint8_t[kInputReportSize];
 
+    if (pipe(inputPipe) < 0) {
+        // Without the self-pipe there is no way to wake the input thread out
+        // of select(), so disconnect() would hang in join(). Fail the connect.
+        Logger::getInstance()->error("Failed to create shutdown pipe: %d\n", errno);
+        inputPipe[0] = inputPipe[1] = -1;
+        return false;
+    }
+
     connected = true;
-    inputThreadRunning = true;
     inputThread = std::thread([this]() {
         uint8_t buffer[65];
-        while (inputThreadRunning && connected && hidDevice >= 0) {
-            ssize_t bytesRead = read(hidDevice, buffer, sizeof(buffer));
-            if (bytesRead > 0 && inputThreadRunning && connected) {
-                InputReportCallback(this, (int) bytesRead, buffer);
-            } else if (bytesRead < 0) {
-                break;
-            } else if (bytesRead == 0) {
+        while (connected && hidDevice >= 0) {
+            fd_set fds;
+            FD_ZERO(&fds);
+            FD_SET(hidDevice, &fds);
+            int maxFd = hidDevice + 1;
+            if (inputPipe[0] >= 0) {
+                FD_SET(inputPipe[0], &fds);
+                if (inputPipe[0] + 1 > maxFd) {
+                    maxFd = inputPipe[0] + 1;
+                }
+            }
+
+            int ret = select(maxFd, &fds, nullptr, nullptr, nullptr);
+            if (ret < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                Logger::getInstance()->error("Select failed: %d\n", errno);
                 break;
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            if (inputPipe[0] >= 0 && FD_ISSET(inputPipe[0], &fds)) {
+                break; // shutdown signal
+            }
+
+            if (FD_ISSET(hidDevice, &fds)) {
+                ssize_t bytesRead = read(hidDevice, buffer, sizeof(buffer));
+                if (bytesRead > 0 && connected) {
+                    InputReportCallback(this, (int) bytesRead, buffer);
+                } else if (bytesRead < 0) {
+                    Logger::getInstance()->error("Read failed with error: %d\n", errno);
+                    break;
+                } else {
+                    break; // EOF — device disconnected
+                }
+            }
         }
+
+        Logger::getInstance()->debug("Input thread exiting\n");
     });
 
     writeThreadRunning = true;
@@ -82,26 +120,44 @@ void USBDevice::update() {
 }
 
 void USBDevice::disconnect() {
+    // Drain the write queue first, while connected is still true: writeThreadLoop
+    // only performs the actual write when connected is set, so flipping it before
+    // draining would silently discard any final commands (e.g. blackout()) that
+    // were just queued.
     while (writeQueueSize.load() > 0 && writeThreadRunning) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     connected = false;
-    inputThreadRunning = false;
+
+    // Wake the input thread via the self-pipe so it exits its select() block
+    if (inputPipe[1] >= 0) {
+        uint8_t c = 0;
+        (void) write(inputPipe[1], &c, 1);
+    }
+
     writeThreadRunning = false;
     writeQueueCV.notify_all();
-
-    if (hidDevice >= 0) {
-        close(hidDevice);
-        hidDevice = -1;
+    if (writeThread.joinable()) {
+        writeThread.join();
     }
 
     if (inputThread.joinable()) {
         inputThread.join();
     }
 
-    if (writeThread.joinable()) {
-        writeThread.join();
+    if (inputPipe[0] >= 0) {
+        close(inputPipe[0]);
+        inputPipe[0] = -1;
+    }
+    if (inputPipe[1] >= 0) {
+        close(inputPipe[1]);
+        inputPipe[1] = -1;
+    }
+
+    if (hidDevice >= 0) {
+        close(hidDevice);
+        hidDevice = -1;
     }
 
     if (inputBuffer) {
@@ -109,7 +165,7 @@ void USBDevice::disconnect() {
         inputBuffer = nullptr;
     }
 
-    debug("Device disconnected\n");
+    Logger::getInstance()->debug("Device disconnected\n");
 }
 
 void USBDevice::forceStateSync() {
@@ -118,7 +174,6 @@ void USBDevice::forceStateSync() {
 
 bool USBDevice::writeData(std::vector<uint8_t> data) {
     if (hidDevice < 0 || !connected || data.empty()) {
-        debug("HID device not open, not connected, or empty data\n");
         return false;
     }
 
@@ -156,7 +211,7 @@ void USBDevice::writeThreadLoop() {
         if (!data.empty() && hidDevice >= 0 && connected) {
             ssize_t bytesWritten = write(hidDevice, data.data(), data.size());
             if (bytesWritten != (ssize_t) data.size()) {
-                debug_force("Raw write failed: %s (wrote %zd of %zu bytes)\n", strerror(errno), bytesWritten, data.size());
+                Logger::getInstance()->error("Raw write failed: %s (wrote %zd of %zu bytes)\n", strerror(errno), bytesWritten, data.size());
             }
         }
     }

@@ -37,19 +37,16 @@ RotateMD11PAP3MCPProfile::RotateMD11PAP3MCPProfile(ProductPAP3MCP *product) : PA
         }
 
         product->forceStateSync();
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("Rotate/aircraft/systems/light_fgs_panel_brt_ratio", [](float panelLights) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("Rotate/aircraft/systems/elec_dc_batt_bus_pwrd");
-    });
+    },
+        this);
 
     // MD-11 MCP has NO LED annunciators - all LEDs disabled by not setting up monitors
     // The real MD-11 uses a different display system (not LED buttons)
-}
-
-RotateMD11PAP3MCPProfile::~RotateMD11PAP3MCPProfile() {
-    Dataref::getInstance()->unbind("Rotate/aircraft/systems/elec_dc_batt_bus_pwrd");
-    Dataref::getInstance()->unbind("Rotate/aircraft/systems/light_fgs_panel_brt_ratio");
 }
 
 bool RotateMD11PAP3MCPProfile::IsEligible() {
@@ -79,25 +76,39 @@ const std::unordered_map<uint16_t, PAP3MCPButtonDef> &RotateMD11PAP3MCPProfile::
     static const std::unordered_map<uint16_t, PAP3MCPButtonDef> buttons = {
         // Row 1 (byte 0x01) - Main autopilot mode buttons
         // Note: MD-11 uses dataref writes instead of commands for buttons
-        {1, {"SPEED (FMS SPD)", "Rotate/aircraft/controls/fgs_fms_spd", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
-        {2, {"PROF (VNAV)", "Rotate/aircraft/controls/fgs_prof", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {1, {"SPEED", "Rotate/aircraft/controls/fgs_fms_spd", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {2, {"PROF", "Rotate/aircraft/controls/fgs_prof", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
         {3, {"LVL CHG", "Rotate/aircraft/controls/fgs_alt_mode_sel", PAP3MCPDatarefType::SET_VALUE_PHASED, -1.0}},
         {4, {"HDG SEL", "Rotate/aircraft/controls/fgs_hdg_mode_sel", PAP3MCPDatarefType::SET_VALUE_PHASED, -1.0}},
-        {5, {"NAV (LNAV)", "Rotate/aircraft/controls/fgs_nav", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
-        {7, {"APPR/LAND (APP)", "Rotate/aircraft/controls/fgs_appr_land", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {5, {"NAV", "Rotate/aircraft/controls/fgs_nav", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {7, {"APP", "Rotate/aircraft/controls/fgs_appr_land", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
 
         // Row 2 (byte 0x02) - Additional autopilot buttons
-        {8, {"ALT HOLD", "Rotate/aircraft/controls/fgs_alt_mode_sel", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
-        {9, {"V/S (FPA)", "Rotate/aircraft/controls/fgs_vs_fpa", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
-        {10, {"CMD A (AP)", "Rotate/aircraft/controls/fgs_autoflight", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
-        {11, {"CWS A (AFS OVR 1)", "Rotate/aircraft/controls/fgs_afs_ovrd_off_1", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
-        {12, {"CMD B (AP)", "Rotate/aircraft/controls/fgs_autoflight", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
-        {13, {"CWS B (AFS OVR 2)", "Rotate/aircraft/controls/fgs_afs_ovrd_off_2", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
-        {14, {"C/O (IAS/MACH)", "Rotate/aircraft/controls/fgs_ias_mach", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {8, {"ALT HLD", "Rotate/aircraft/controls/fgs_alt_mode_sel", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {9, {"V/S", "Rotate/aircraft/controls/fgs_vs_fpa", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {10, {"CMD A", "Rotate/aircraft/controls/fgs_autoflight", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {11, {"CWS A", "Rotate/aircraft/controls/fgs_afs_ovrd_off_1", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {12, {"CMD B", "Rotate/aircraft/controls/fgs_autoflight", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {13, {"CWS B", "Rotate/aircraft/controls/fgs_afs_ovrd_off_2", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
+        {14, {"C/O", "Rotate/aircraft/controls/fgs_ias_mach", PAP3MCPDatarefType::SET_VALUE_PHASED, 1.0}},
         {15, {"SPD INTV", "Rotate/aircraft/controls/fgs_spd_sel_mode", PAP3MCPDatarefType::SET_VALUE_PHASED, -1.0}},
 
         // Row 3 (byte 0x03)
-        {16, {"ALT INTV", "Rotate/aircraft/controls/fgs_alt_mode_sel", PAP3MCPDatarefType::SET_VALUE_PHASED, -1.0}}};
+        {16, {"ALT INTV", "Rotate/aircraft/controls/fgs_alt_mode_sel", PAP3MCPDatarefType::SET_VALUE_PHASED, -1.0}},
+
+        // Encoder rotations (exposed as button pairs by the hardware)
+        {17, {"CRS CAPT DEC", "sim/autopilot/heading_down"}},
+        {18, {"CRS CAPT INC", "sim/autopilot/heading_up"}},
+        {19, {"SPD DEC", "Rotate/aircraft/controls_c/fgs_spd_sel_dn"}},
+        {20, {"SPD INC", "Rotate/aircraft/controls_c/fgs_spd_sel_up"}},
+        {21, {"HDG DEC", "Rotate/aircraft/controls_c/fgs_hdg_sel_dn"}},
+        {22, {"HDG INC", "Rotate/aircraft/controls_c/fgs_hdg_sel_up"}},
+        {23, {"ALT DEC", "Rotate/aircraft/controls_c/fgs_alt_sel_dn"}},
+        {24, {"ALT INC", "Rotate/aircraft/controls_c/fgs_alt_sel_up"}},
+        {25, {"CRS FO DEC", "sim/autopilot/heading_down"}},
+        {26, {"CRS FO INC", "sim/autopilot/heading_up"}},
+        {38, {"VS DEC", "Rotate/aircraft/controls_c/fgs_pitch_sel_dn"}},
+        {39, {"VS INC", "Rotate/aircraft/controls_c/fgs_pitch_sel_up"}}};
     return buttons;
 }
 

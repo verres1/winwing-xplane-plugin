@@ -33,7 +33,8 @@ enum class AGPLed : int {
 
 enum class AGPTerrainNDPreference {
     CAPTAIN = 0,
-    FIRST_OFFICER
+    FIRST_OFFICER,
+    BOTH
 };
 
 class ProductAGP : public USBDevice {
@@ -58,9 +59,10 @@ class ProductAGP : public USBDevice {
         AGPTerrainNDPreference terrainNDPreference;
 
         const char *classIdentifier() override;
+        const char *activeProfileName() const override;
         bool connect() override;
-        void disconnect() override;
         void update() override;
+        void blackout() override;
         void didReceiveData(int reportId, uint8_t *report, int reportLength) override;
         void didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count = 1) override;
 

@@ -123,14 +123,50 @@ enum class FMCKey : unsigned char {
     MCDU_OVERFLY,
 };
 
+enum class FMCDatarefType : unsigned char {
+    EXECUTE_CMD_ONCE = 1,
+    EXECUTE_MULTIPLE_CMD_ONCE,
+    EXECUTE_CMD_PHASED,
+    SET_VALUE,
+    SET_VALUE_PHASED,
+    ADJUST_VALUE
+};
+
 struct FMCButtonDef {
         std::variant<FMCKey, std::vector<FMCKey>> key;
         std::string dataref;
+        FMCDatarefType datarefType = FMCDatarefType::EXECUTE_CMD_PHASED;
         double value = 0.0;
+};
+
+// SimAppPro "Screen Layout Settings" per device: Character Size (width x height of
+// each character) and Screen Position (top-left x/y). The FMC applies the entry for
+// the connected hardware whenever a font is loaded, so the 14 display rows line up
+// with the physical LSK keys.
+struct FMCScreenLayout {
+        unsigned char characterHeight;
+        unsigned char characterWidth;
+        unsigned char x;
+        unsigned char y;
 };
 
 class FMCHardwareMapping {
     public:
+        static FMCScreenLayout ScreenLayoutForHardware(FMCHardwareType hardwareType) {
+            switch (hardwareType) {
+                case FMCHardwareType::HARDWARE_MCDU:
+                    return {29, 23, 16, 17};
+                case FMCHardwareType::HARDWARE_PFP3N:
+                    return {32, 23, 14, 4};
+                case FMCHardwareType::HARDWARE_PFP4:
+                    return {32, 23, 14, 4};
+                case FMCHardwareType::HARDWARE_PFP7:
+                    return {32, 23, 14, 4};
+                default:
+                    return {29, 23, 16, 17};
+            }
+        }
+
         static FMCKey ButtonIdentifierForIndex(FMCHardwareType hardwareType, int index) {
             switch (hardwareType) {
                 case FMCHardwareType::HARDWARE_MCDU:

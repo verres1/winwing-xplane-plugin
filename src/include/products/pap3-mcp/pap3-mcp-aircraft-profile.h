@@ -1,19 +1,22 @@
 #ifndef PAP3MCP_AIRCRAFT_PROFILE_H
 #define PAP3MCP_AIRCRAFT_PROFILE_H
 
+#include "profile-cleanup.h"
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include <XPLMUtilities.h>
 
-enum class PAP3MCPLed : int {
+enum class PAP3MCPLed : unsigned char {
     // Dimming channels (use sendDimming with brightness 0-255)
     BACKLIGHT = 0,              // Channel 0: Panel backlight dimming
     LCD_BACKLIGHT = 1,          // Channel 1: LCD screen dimming
     OVERALL_LED_BRIGHTNESS = 2, // Channel 2: Overall brightness
 
     // Individual LEDs (use sendLed with ON/OFF only)
+    _START = 3,
     N1 = 3,
     SPEED = 4,
     VNAV = 5,
@@ -30,7 +33,8 @@ enum class PAP3MCPLed : int {
     CWS_B = 16,
     AT_ARM = 17,
     MA_CAPT = 18,
-    MA_FO = 19
+    MA_FO = 19,
+    _END = 19,
 };
 
 enum PAP3MCPDatarefType : unsigned char {
@@ -39,6 +43,7 @@ enum PAP3MCPDatarefType : unsigned char {
     SET_VALUE,
     SET_VALUE_PHASED,
     TOGGLE_VALUE,
+    ADJUST_VALUE,
 };
 
 struct PAP3MCPButtonDef {
@@ -66,6 +71,8 @@ struct PAP3MCPDisplayData {
         bool showLabels = false;
         bool showDashesWhenInactive = false; // Show dashes (---) when displays are inactive
         bool showLabelsWhenInactive = false; // Show labels even when displays are inactive
+
+        uint8_t machDigits = 2; // Number of MACH decimal digits to display (2 = .84, 3 = .842)
 
         // Special display flags
         bool digitA = false; // Special 'A' digit for SPD/MACH mode
@@ -106,7 +113,10 @@ class PAP3MCPAircraftProfile {
     public:
         PAP3MCPAircraftProfile(ProductPAP3MCP *product) :
             product(product) {};
-        virtual ~PAP3MCPAircraftProfile() = default;
+
+        virtual ~PAP3MCPAircraftProfile() {
+            cleanupProfile(this);
+        }
 
         virtual const std::vector<std::string> &displayDatarefs() const = 0;
 

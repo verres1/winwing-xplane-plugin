@@ -16,6 +16,13 @@ struct MenuItem {
         std::string name;
         bool checked = false;
         MenuItemContent content;
+
+        static MenuItem Separator() {
+            MenuItem item;
+            item.name = "---";
+            item.content = [](int) {};
+            return item;
+        }
 };
 
 class PluginsMenu {
@@ -25,6 +32,7 @@ class PluginsMenu {
         static PluginsMenu *instance;
 
         XPLMMenuID mainMenuId;
+        int mainMenuItemIndex;
         int nextItemId;
         std::map<int, std::pair<int, std::function<void(int)>>> menuCallbacks; // itemId -> (itemIndex, callback)
         std::map<int, std::string> itemNames;                                  // itemId -> name
@@ -35,19 +43,20 @@ class PluginsMenu {
 
         static void handleMenuAction(void *mRef, void *iRef);
         void ensureMenuExists();
-        int addItemInternal(const std::string &name, const MenuItemContent &content, bool persistent, bool checked);
+        int addItemInternal(const std::string &name, const MenuItemContent &content, bool persistent, bool checked, int submenuId);
         void addMenuItemsToMenu(XPLMMenuID parentMenu, const std::vector<MenuItem> &items, bool persistent);
 
     public:
         static PluginsMenu *getInstance();
-        int addItem(const std::string &name, const MenuItemContent &content, bool checked = false);
-        int addPersistentItem(const std::string &name, const MenuItemContent &content, bool checked = false);
-        void removeItem(int itemIndex);
+        int addItem(const std::string &name, const MenuItemContent &content, bool checked = false, int submenuId = -1);
+        int addPersistentItem(const std::string &name, const MenuItemContent &content, bool checked = false, int submenuId = -1);
+        void removeItem(int itemId);
         void setItemName(int itemIndex, const std::string &name);
         void setItemChecked(int itemId, bool checked);
         void uncheckSubmenuSiblings(int itemId);
         bool isItemChecked(int itemIndex);
         void clearAllItems();
+        void teardown();
 };
 
 #endif

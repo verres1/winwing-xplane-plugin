@@ -4,7 +4,11 @@
 #include "config.h"
 #include "dataref.h"
 #include "plugins-menu.h"
+#include "profiles/rotatemd11-agp-profile.h"
 #include "profiles/toliss-agp-profile.h"
+#include "profiles/xcrafts-ejets-agp-profile.h"
+#include "profiles/xcrafts-erj-agp-profile.h"
+#include "profiles/zibo-agp-profile.h"
 #include "segment-display.h"
 
 #include <algorithm>
@@ -13,6 +17,8 @@
 #include <XPLMUtilities.h>
 
 ProductAGP::ProductAGP(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName) : USBDevice(hidDevice, vendorId, productId, vendorName, productName) {
+    profile = nullptr;
+    menuItemId = -1;
     lastButtonStateLo = 0;
     lastButtonStateHi = 0;
     pressedButtonIndices = {};
@@ -21,15 +27,39 @@ ProductAGP::ProductAGP(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t pr
 }
 
 ProductAGP::~ProductAGP() {
-    disconnect();
+    AppState::getInstance()->cancelTasksForOwner(this);
+    blackout();
+
+    PluginsMenu::getInstance()->removeItem(menuItemId);
+
+    if (profile) {
+        delete profile;
+        profile = nullptr;
+    }
 }
 
 const char *ProductAGP::classIdentifier() {
     return "AGP Metal";
 }
 
+const char *ProductAGP::activeProfileName() const {
+    return profile ? typeid(*profile).name() : "none";
+}
+
 void ProductAGP::setProfileForCurrentAircraft() {
-    if (TolissAGPProfile::IsEligible()) {
+    if (XCraftsEjetsAGPProfile::IsEligible()) {
+        profile = new XCraftsEjetsAGPProfile(this);
+        profileReady = true;
+    } else if (RotateMD11AGPProfile::IsEligible()) {
+        profile = new RotateMD11AGPProfile(this);
+        profileReady = true;
+    } else if (XCraftsErjAGPProfile::IsEligible()) {
+        profile = new XCraftsErjAGPProfile(this);
+        profileReady = true;
+    } else if (ZiboAGPProfile::IsEligible()) {
+        profile = new ZiboAGPProfile(this);
+        profileReady = true;
+    } else if (TolissAGPProfile::IsEligible()) {
         profile = new TolissAGPProfile(this);
         profileReady = true;
     } else {
@@ -53,6 +83,8 @@ bool ProductAGP::connect() {
     std::string terrainPreference = AppState::getInstance()->readPreference("AGPTerrainND", "first_officer");
     if (terrainPreference == "captain") {
         terrainNDPreference = AGPTerrainNDPreference::CAPTAIN;
+    } else if (terrainPreference == "both") {
+        terrainNDPreference = AGPTerrainNDPreference::BOTH;
     } else {
         terrainNDPreference = AGPTerrainNDPreference::FIRST_OFFICER;
     }
@@ -66,7 +98,7 @@ bool ProductAGP::connect() {
                  setLedBrightness(AGPLed::OVERALL_LEDS_BRIGHTNESS, 255);
                  setAllLedsEnabled(true);
 
-                 AppState::getInstance()->executeAfter(2000, [this]() {
+                 AppState::getInstance()->executeAfter(2000, this, [this]() {
                      setAllLedsEnabled(false);
                  });
              }},
@@ -83,25 +115,24 @@ bool ProductAGP::connect() {
                                                PluginsMenu::getInstance()->uncheckSubmenuSiblings(itemId);
                                                PluginsMenu::getInstance()->setItemChecked(itemId, true);
                                            }},
+                                          {.name = "ND1 + ND2 (Both)", .checked = terrainPreference == "both", .content = [this](int itemId) {
+                                               AppState::getInstance()->writePreference("AGPTerrainND", "both");
+                                               terrainNDPreference = AGPTerrainNDPreference::BOTH;
+                                               PluginsMenu::getInstance()->uncheckSubmenuSiblings(itemId);
+                                               PluginsMenu::getInstance()->setItemChecked(itemId, true);
+                                           }},
                                       }},
         });
 
     return true;
 }
 
-void ProductAGP::disconnect() {
+void ProductAGP::blackout() {
     setLedBrightness(AGPLed::BACKLIGHT, 0);
     setLedBrightness(AGPLed::LCD_BRIGHTNESS, 0);
     setLedBrightness(AGPLed::OVERALL_LEDS_BRIGHTNESS, 0);
 
-    PluginsMenu::getInstance()->removeItem(menuItemId);
-
-    if (profile) {
-        delete profile;
-        profile = nullptr;
-    }
-
-    USBDevice::disconnect();
+    setAllLedsEnabled(false);
 }
 
 void ProductAGP::update() {
@@ -240,14 +271,6 @@ void ProductAGP::didReceiveData(int reportId, uint8_t *report, int reportLength)
     }
 
     if (reportId != 1 || reportLength < 13) {
-#if DEBUG
-//        printf("[%s] Ignoring reportId %d, length %d\n", classIdentifier(), reportId, reportLength);
-//        printf("[%s] Data (hex): ", classIdentifier());
-//        for (int i = 0; i < reportLength; ++i) {
-//            printf("%02X ", report[i]);
-//        }
-//        printf("\n");
-#endif
         return;
     }
 
@@ -282,6 +305,14 @@ void ProductAGP::didReceiveData(int reportId, uint8_t *report, int reportLength)
 
 void ProductAGP::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count) {
     USBDevice::didReceiveButton(hardwareButtonIndex, pressed, count);
+
+    if (!connected || !profile) {
+        return;
+    }
+
+    if (isButtonHandledByXPlane(hardwareButtonIndex)) {
+        return;
+    }
 
     auto &buttons = profile->buttonDefs();
     auto it = buttons.find(hardwareButtonIndex);

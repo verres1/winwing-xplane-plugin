@@ -4,9 +4,15 @@
 #include "config.h"
 #include "dataref.h"
 #include "pap3-mcp-lcd-segments.h"
+#include "plugins-menu.h"
 #include "profiles/ff777-pap3-mcp-profile.h"
-#include "profiles/laminar-pap3-mcp-profile.h"
+#include "profiles/fps748-pap3-mcp-profile.h"
+#include "profiles/laminar-737-pap3-mcp-profile.h"
 #include "profiles/rotatemd11-pap3-mcp-profile.h"
+#include "profiles/sparky744-pap3-mcp-profile.h"
+#include "profiles/stratosphere77w-pap3-mcp-profile.h"
+#include "profiles/xcrafts-ejets-pap3-mcp-profile.h"
+#include "profiles/xcrafts-erj-pap3-mcp-profile.h"
 #include "profiles/zibo-pap3-mcp-profile.h"
 
 #include <algorithm>
@@ -24,6 +30,7 @@ using namespace pap3mcp::lcd;
 ProductPAP3MCP::ProductPAP3MCP(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName) :
     USBDevice(hidDevice, vendorId, productId, vendorName, productName) {
     profile = nullptr;
+    menuItemId = -1;
     displayData = {};
     lastUpdateCycle = 0;
     pressedButtonIndices = {};
@@ -32,12 +39,29 @@ ProductPAP3MCP::ProductPAP3MCP(HIDDeviceHandle hidDevice, uint16_t vendorId, uin
 }
 
 ProductPAP3MCP::~ProductPAP3MCP() {
-    disconnect();
+    AppState::getInstance()->cancelTasksForOwner(this);
+    blackout();
+
+    PluginsMenu::getInstance()->removeItem(menuItemId);
+
+    if (profile) {
+        delete profile;
+        profile = nullptr;
+    }
 }
 
 void ProductPAP3MCP::setProfileForCurrentAircraft() {
     if (ZiboPAP3MCPProfile::IsEligible()) {
         profile = new ZiboPAP3MCPProfile(this);
+        profileReady = true;
+    } else if (XCraftsEjetsPAP3MCPProfile::IsEligible()) {
+        profile = new XCraftsEjetsPAP3MCPProfile(this);
+        profileReady = true;
+    } else if (XCraftsErjPAP3MCPProfile::IsEligible()) {
+        profile = new XCraftsErjPAP3MCPProfile(this);
+        profileReady = true;
+    } else if (Strato77WPAP3MCPProfile::IsEligible()) {
+        profile = new Strato77WPAP3MCPProfile(this);
         profileReady = true;
     } else if (FF777PAP3MCPProfile::IsEligible()) {
         profile = new FF777PAP3MCPProfile(this);
@@ -45,14 +69,27 @@ void ProductPAP3MCP::setProfileForCurrentAircraft() {
     } else if (RotateMD11PAP3MCPProfile::IsEligible()) {
         profile = new RotateMD11PAP3MCPProfile(this);
         profileReady = true;
-    } else if (LaminarPAP3MCPProfile::IsEligible()) {
-        profile = new LaminarPAP3MCPProfile(this);
+    } else if (FPS748PAP3MCPProfile::IsEligible()) {
+        profile = new FPS748PAP3MCPProfile(this);
         profileReady = true;
+    } else if (SparkyB744PAP3MCPProfile::IsEligible()) {
+        profile = new SparkyB744PAP3MCPProfile(this);
+        profileReady = true;
+    } else if (Laminar737PAP3MCPProfile::IsEligible()) {
+        profile = new Laminar737PAP3MCPProfile(this);
+        profileReady = true;
+    } else {
+        profile = nullptr;
+        profileReady = false;
     }
 }
 
 const char *ProductPAP3MCP::classIdentifier() {
     return "PAP3-MCP";
+}
+
+const char *ProductPAP3MCP::activeProfileName() const {
+    return profile ? typeid(*profile).name() : "none";
 }
 
 bool ProductPAP3MCP::connect() {
@@ -62,6 +99,23 @@ bool ProductPAP3MCP::connect() {
         setLedBrightness(PAP3MCPLed::BACKLIGHT, 0);
         setLedBrightness(PAP3MCPLed::LCD_BACKLIGHT, 0);
         setLedBrightness(PAP3MCPLed::OVERALL_LED_BRIGHTNESS, 0);
+
+        menuItemId = PluginsMenu::getInstance()->addItem(
+            classIdentifier(),
+            std::vector<MenuItem>{
+                {.name = "Identify", .content = [this](int menuId) {
+                     setLedBrightness(PAP3MCPLed::BACKLIGHT, 255);
+                     setLedBrightness(PAP3MCPLed::LCD_BACKLIGHT, 255);
+                     setLedBrightness(PAP3MCPLed::OVERALL_LED_BRIGHTNESS, 255);
+                     setAllLedsEnabled(true);
+                     AppState::getInstance()->executeAfter(2000, this, [this]() {
+                         setLedBrightness(PAP3MCPLed::BACKLIGHT, 128);
+                         setLedBrightness(PAP3MCPLed::LCD_BACKLIGHT, 128);
+                         setLedBrightness(PAP3MCPLed::OVERALL_LED_BRIGHTNESS, 128);
+                         setAllLedsEnabled(false);
+                     });
+                 }},
+            });
 
         if (!profile) {
             setProfileForCurrentAircraft();
@@ -73,37 +127,15 @@ bool ProductPAP3MCP::connect() {
     return false;
 }
 
-void ProductPAP3MCP::disconnect() {
+void ProductPAP3MCP::blackout() {
     // Turn off all LEDs
     setLedBrightness(PAP3MCPLed::BACKLIGHT, 0);
     setLedBrightness(PAP3MCPLed::LCD_BACKLIGHT, 0);
     setLedBrightness(PAP3MCPLed::OVERALL_LED_BRIGHTNESS, 0);
-    setLedBrightness(PAP3MCPLed::N1, 0);
-    setLedBrightness(PAP3MCPLed::SPEED, 0);
-    setLedBrightness(PAP3MCPLed::VNAV, 0);
-    setLedBrightness(PAP3MCPLed::LVL_CHG, 0);
-    setLedBrightness(PAP3MCPLed::HDG_SEL, 0);
-    setLedBrightness(PAP3MCPLed::LNAV, 0);
-    setLedBrightness(PAP3MCPLed::VORLOC, 0);
-    setLedBrightness(PAP3MCPLed::APP, 0);
-    setLedBrightness(PAP3MCPLed::ALT_HLD, 0);
-    setLedBrightness(PAP3MCPLed::VS, 0);
-    setLedBrightness(PAP3MCPLed::CMD_A, 0);
-    setLedBrightness(PAP3MCPLed::CWS_A, 0);
-    setLedBrightness(PAP3MCPLed::CMD_B, 0);
-    setLedBrightness(PAP3MCPLed::CWS_B, 0);
-    setLedBrightness(PAP3MCPLed::AT_ARM, 0);
-    setLedBrightness(PAP3MCPLed::MA_CAPT, 0);
-    setLedBrightness(PAP3MCPLed::MA_FO, 0);
+
+    setAllLedsEnabled(false);
 
     clearDisplays();
-
-    if (profile) {
-        delete profile;
-        profile = nullptr;
-    }
-
-    USBDevice::disconnect();
 }
 
 void ProductPAP3MCP::update() {
@@ -125,6 +157,10 @@ void ProductPAP3MCP::update() {
 }
 
 void ProductPAP3MCP::updateDisplays(bool force) {
+    if (!connected || !profile) {
+        return;
+    }
+
     bool shouldUpdate = force;
     auto datarefManager = Dataref::getInstance();
     for (const std::string &dataref : profile->displayDatarefs()) {
@@ -230,25 +266,33 @@ void ProductPAP3MCP::sendLCDDisplay(const std::string &speed, int heading, int a
     } else {
         // SPD: IAS vs MACH rendering
         const float spd = displayData.speed;
-        const bool isMach = (spd < 100.0f);
+        const bool isMach = displayData.digitA;
 
         if (displayData.speedVisible && isMach) {
             // MACH mode
             float mach = (spd < 1.0f) ? std::clamp(spd, 0.0f, 0.9999f) : std::clamp(spd / 100.0f, 0.0f, 0.9999f);
-            const int twoDigits = std::clamp(static_cast<int>(std::floor(mach * 1000.0f / 10.0f + 0.5f)), 0, 99);
-            const int tens = (twoDigits / 10) % 10;
-            const int units = twoDigits % 10;
 
-            drawDigit(G0, payload, SPD_TENS, tens);
-            drawDigit(G0, payload, SPD_UNITS, units);
+            if (displayData.machDigits >= 3) {
+                // ".XXX" — three decimal digits in HUNDREDS/TENS/UNITS, lower colon
+                // dot (before HUNDREDS) as the decimal point. KILO stays blank.
+                const int threeDigits = std::clamp(static_cast<int>(std::floor(mach * 1000.0f + 0.5f)), 0, 999);
+                drawDigit(G0, payload, SPD_HUNDREDS, (threeDigits / 100) % 10);
+                drawDigit(G0, payload, SPD_TENS, (threeDigits / 10) % 10);
+                drawDigit(G0, payload, SPD_UNITS, threeDigits % 10);
+                setFlag(payload, OFF_1E, DOT_SPD_COLON_LOWER, true);
+            } else {
+                // "0.XX" — KILO=0, HUNDREDS+TENS hold the two decimal digits, dot between them
+                const int twoDigits = std::clamp(static_cast<int>(std::floor(mach * 100.0f + 0.5f)), 0, 99);
+                drawDigit(G0, payload, SPD_TENS, (twoDigits / 10) % 10);
+                drawDigit(G0, payload, SPD_UNITS, twoDigits % 10);
+                setFlag(payload, OFF_19, DOT_SPD, true);
+                setFlag(payload, OFF_22, SPD_BAR_TOP, displayData.digitA);
+                setFlag(payload, OFF_1E, SPD_BAR_BOTTOM, displayData.digitA);
+            }
 
             setFlag(payload, OFF_36, LBL_IAS, displayData.showLabels && false);
             setFlag(payload, OFF_32, LBL_MACH_L, displayData.showLabels && true);
             setFlag(payload, OFF_2E, LBL_MACH_R, displayData.showLabels && true);
-            setFlag(payload, OFF_19, DOT_SPD, true);
-
-            setFlag(payload, OFF_22, SPD_BAR_TOP, displayData.digitA);
-            setFlag(payload, OFF_1E, SPD_BAR_BOTTOM, displayData.digitA);
         } else if (displayData.speedVisible) {
             // IAS mode
             const int ias = std::max(0, static_cast<int>(std::floor(spd + 0.5f)));
@@ -345,12 +389,10 @@ void ProductPAP3MCP::sendLCDDisplay(const std::string &speed, int heading, int a
             if (absV >= 100) {
                 drawDigit(G2, payload, VSPD_HUNDREDS, h);
             }
-            if (absV >= 10) {
+            if (absV >= 10 || absV == 0) {
                 drawDigit(G2, payload, VSPD_TENS, t);
             }
-            if (absV >= 1) {
-                drawDigit(G2, payload, VSPD_UNITS, u);
-            }
+            drawDigit(G2, payload, VSPD_UNITS, u);
 
             const bool neg = (v < 0);
             const bool pos = (v > 0);
@@ -407,6 +449,10 @@ void ProductPAP3MCP::sendLCDDisplay(const std::string &speed, int heading, int a
         }
     }
 
+    sendRawLCDPayload(payload);
+}
+
+void ProductPAP3MCP::sendRawLCDPayload(const std::array<uint8_t, 32> &payload) {
     // Send LCD payload command (opcode 0x38)
     // Packet structure (verified against working implementation):
     // - Bytes 0-3:   Header [F0 00 SEQ 38]
@@ -490,6 +536,16 @@ void ProductPAP3MCP::sendLCDDisplay(const std::string &speed, int heading, int a
     writeData(commitFrame);
     if (++packetNumber == 0) {
         packetNumber = 1;
+    }
+}
+
+void ProductPAP3MCP::setAllLedsEnabled(bool enable) {
+    unsigned char start = static_cast<unsigned char>(PAP3MCPLed::_START);
+    unsigned char end = static_cast<unsigned char>(PAP3MCPLed::_END);
+
+    for (unsigned char i = start; i <= end; ++i) {
+        PAP3MCPLed led = static_cast<PAP3MCPLed>(i);
+        setLedBrightness(led, enable ? 1 : 0);
     }
 }
 
@@ -578,36 +634,6 @@ void ProductPAP3MCP::didReceiveData(int reportId, uint8_t *report, int reportLen
     lastButtonStateLo = buttonsLo;
     lastButtonStateHi = buttonsHi;
 
-    static uint8_t lastSwitchBytes[7] = {0}; // Track switch states for bytes 0x04-0x06
-    static const std::pair<uint8_t, uint8_t> switches[] = {
-        {0x04, 0x08}, // FD CAPT (OFF line)
-        {0x04, 0x20}, // FD FO (OFF line)
-        {0x04, 0x80}, // AP DISCONNECT UP
-        {0x05, 0x01}, // AP DISCONNECT DOWN
-        {0x06, 0x01}, // A/T ARMED
-        {0x06, 0x02}  // A/T DISARMED
-    };
-
-    for (const auto &sw : switches) {
-        uint8_t byteOffset = sw.first;
-        uint8_t bitMask = sw.second;
-
-        if (byteOffset >= reportLength) {
-            continue;
-        }
-
-        bool currentState = (report[byteOffset] & bitMask) != 0;
-        bool lastState = (lastSwitchBytes[byteOffset] & bitMask) != 0;
-
-        if (currentState != lastState) {
-            profile->handleSwitchChanged(byteOffset, bitMask, currentState);
-        }
-    }
-
-    for (int i = 4; i <= 6 && i < reportLength; i++) {
-        lastSwitchBytes[i] = report[i];
-    }
-
     for (int byteIndex = 1; byteIndex <= 6 && byteIndex < reportLength; byteIndex++) {
         uint8_t buttonByte = report[byteIndex];
 
@@ -617,45 +643,72 @@ void ProductPAP3MCP::didReceiveData(int reportId, uint8_t *report, int reportLen
             didReceiveButton(hardwareButtonIndex, pressed);
         }
     }
-
-    // Process bank angle switch (byte 0x05)
-    static uint8_t lastBankAngleByte = 0;
-    if (reportLength > 0x05) {
-        uint8_t currentBankAngleByte = report[0x05];
-        if (currentBankAngleByte != lastBankAngleByte) {
-            profile->handleBankAngleSwitch(currentBankAngleByte);
-            lastBankAngleByte = currentBankAngleByte;
-        }
-    }
-
-    // Process encoder changes (bytes starting from offset 0x15)
-    const std::vector<PAP3MCPEncoderDef> &currentEncoderDefs = profile->encoderDefs();
-
-    // Encoder positions are at specific byte offsets (0x15, 0x17, 0x19, 0x1B, 0x1D, 0x1F)
-    static const uint8_t encoderOffsets[] = {0x15, 0x17, 0x19, 0x1B, 0x1D, 0x1F};
-    static uint8_t lastEncoderPos[6] = {0};
-
-    for (int i = 0; i < 6 && i < currentEncoderDefs.size(); i++) {
-        if (encoderOffsets[i] < reportLength) {
-            uint8_t currentPos = report[encoderOffsets[i]];
-            int8_t delta = static_cast<int8_t>(currentPos - lastEncoderPos[i]);
-
-            if (delta != 0) {
-                profile->encoderRotated(&currentEncoderDefs[i], delta);
-                lastEncoderPos[i] = currentPos;
-            }
-        }
-    }
 }
 
 void ProductPAP3MCP::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count) {
     USBDevice::didReceiveButton(hardwareButtonIndex, pressed, count);
 
+    if (!connected || !profile) {
+        return;
+    }
+
+    if (isButtonHandledByXPlane(hardwareButtonIndex)) {
+        return;
+    }
+
+    // Maintained switches: not in buttonDefs, routed to handleSwitchChanged.
+    // pressedButtonIndices tracks the last known state so this is edge-triggered
+    // on both macOS (IOHIDQueue) and Windows/Linux (raw report button loop).
+    static const struct {
+            uint16_t idx;
+            uint8_t byteOffset;
+            uint8_t bitMask;
+    } switchDefs[] = {
+        {27, 0x04, 0x08}, // FD CAPT (OFF line)
+        {29, 0x04, 0x20}, // FD FO (OFF line)
+        {31, 0x04, 0x80}, // AP DISCONNECT UP
+        {32, 0x05, 0x01}, // AP DISCONNECT DOWN
+        {40, 0x06, 0x01}, // A/T ARMED
+        {41, 0x06, 0x02}, // A/T DISARMED
+    };
+
+    for (const auto &sw : switchDefs) {
+        if (hardwareButtonIndex == sw.idx) {
+            bool wasPressed = pressedButtonIndices.count(hardwareButtonIndex) > 0;
+            if (pressed && !wasPressed) {
+                pressedButtonIndices.insert(hardwareButtonIndex);
+                profile->handleSwitchChanged(sw.byteOffset, sw.bitMask, true);
+            } else if (!pressed && wasPressed) {
+                pressedButtonIndices.erase(hardwareButtonIndex);
+                profile->handleSwitchChanged(sw.byteOffset, sw.bitMask, false);
+            }
+            return;
+        }
+    }
+
+    // Bank angle rotary (byte 0x05, bits 1-5 → indices 33-37).
+    // Only act on the rising edge (the newly active position).
+    if (hardwareButtonIndex >= 33 && hardwareButtonIndex <= 37) {
+        bool wasPressed = pressedButtonIndices.count(hardwareButtonIndex) > 0;
+        if (pressed && !wasPressed) {
+            pressedButtonIndices.insert(hardwareButtonIndex);
+            uint8_t bit = static_cast<uint8_t>(1u << (hardwareButtonIndex - 32));
+            profile->handleBankAngleSwitch(bit);
+        } else if (!pressed && wasPressed) {
+            pressedButtonIndices.erase(hardwareButtonIndex);
+        }
+        return;
+    }
+
     auto &buttons = profile->buttonDefs();
     auto it = buttons.find(hardwareButtonIndex);
-    const PAP3MCPButtonDef *buttonDef = (it != buttons.end()) ? &it->second : nullptr;
+    if (it == buttons.end()) {
+        return;
+    }
 
-    if (!buttonDef || buttonDef->dataref.empty()) {
+    const PAP3MCPButtonDef *buttonDef = &it->second;
+
+    if (buttonDef->dataref.empty()) {
         return;
     }
 

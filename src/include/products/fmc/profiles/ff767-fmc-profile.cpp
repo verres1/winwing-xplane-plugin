@@ -2,7 +2,6 @@
 
 #include "appstate.h"
 #include "dataref.h"
-#include "font.h"
 #include "product-fmc.h"
 
 #include <algorithm>
@@ -16,27 +15,24 @@
 
 FlightFactor767FMCProfile::FlightFactor767FMCProfile(ProductFMC *product) : FMCAircraftProfile(product) {
     product->setAllLedsEnabled(false);
-    product->setFont(Font::GlyphData(FontVariant::Font737, product->identifierByte));
+    product->setFont(FontVariant::Font737);
 
     Dataref::getInstance()->monitorExistingDataref<float>("sim/cockpit/electrical/instrument_brightness", [product](float brightness) {
         uint8_t target = Dataref::getInstance()->get<bool>("sim/cockpit/electrical/avionics_on") ? brightness * 255 : 0;
         product->setLedBrightness(FMCLed::BACKLIGHT, target);
         product->setLedBrightness(FMCLed::SCREEN_BACKLIGHT, target);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("sim/cockpit/electrical/avionics_on", [](bool poweredOn) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("sim/cockpit/electrical/instrument_brightness");
-    });
-}
-
-FlightFactor767FMCProfile::~FlightFactor767FMCProfile() {
-    Dataref::getInstance()->unbind("sim/cockpit/electrical/instrument_brightness");
-    Dataref::getInstance()->unbind("sim/cockpit/electrical/avionics_on");
+    },
+        this);
 }
 
 bool FlightFactor767FMCProfile::IsEligible() {
-    static const std::string author = Dataref::getInstance()->get<std::string>("sim/aircraft/view/acf_author");
-    static const std::string icao = Dataref::getInstance()->get<std::string>("sim/aircraft/view/acf_ICAO");
+    const std::string author = Dataref::getInstance()->get<std::string>("sim/aircraft/view/acf_author");
+    const std::string icao = Dataref::getInstance()->get<std::string>("sim/aircraft/view/acf_ICAO");
 
     if (!author.starts_with("FlightFactor")) {
         return false;
@@ -67,77 +63,77 @@ const std::vector<FMCButtonDef> &FlightFactor767FMCProfile::buttonDefs() const {
 
     return cache.try_emplace(product->deviceVariant,
                     std::vector<FMCButtonDef>{
-                        {FMCKey::LSK1L, "757Avionics/" + cdu + "/LLSK1"},
-                        {FMCKey::LSK2L, "757Avionics/" + cdu + "/LLSK2"},
-                        {FMCKey::LSK3L, "757Avionics/" + cdu + "/LLSK3"},
-                        {FMCKey::LSK4L, "757Avionics/" + cdu + "/LLSK4"},
-                        {FMCKey::LSK5L, "757Avionics/" + cdu + "/LLSK5"},
-                        {FMCKey::LSK6L, "757Avionics/" + cdu + "/LLSK6"},
-                        {FMCKey::LSK1R, "757Avionics/" + cdu + "/RLSK1"},
-                        {FMCKey::LSK2R, "757Avionics/" + cdu + "/RLSK2"},
-                        {FMCKey::LSK3R, "757Avionics/" + cdu + "/RLSK3"},
-                        {FMCKey::LSK4R, "757Avionics/" + cdu + "/RLSK4"},
-                        {FMCKey::LSK5R, "757Avionics/" + cdu + "/RLSK5"},
-                        {FMCKey::LSK6R, "757Avionics/" + cdu + "/RLSK6"},
-                        {std::vector<FMCKey>{FMCKey::PFP_INIT_REF, FMCKey::MCDU_INIT}, "757Avionics/" + cdu + "/init_ref"},
-                        {std::vector<FMCKey>{FMCKey::PFP_ROUTE, FMCKey::MCDU_SEC_FPLN}, "757Avionics/" + cdu + "/rte"},
-                        {FMCKey::PFP3_CLB, "757Avionics/" + cdu + "/clb"},
-                        {FMCKey::PFP3_CRZ, "757Avionics/" + cdu + "/crz"},
-                        {FMCKey::PFP3_DES, "757Avionics/" + cdu + "/des"},
-                        {FMCKey::BRIGHTNESS_DOWN, "ixeg/733/rheostats/light_fmc_pt_act", -0.1},
-                        {FMCKey::BRIGHTNESS_UP, "ixeg/733/rheostats/light_fmc_pt_act", 0.1},
-                        {FMCKey::MENU, "757Avionics/" + cdu + "/mcdu_menu"},
-                        {std::vector<FMCKey>{FMCKey::PFP_LEGS, FMCKey::MCDU_FPLN, FMCKey::MCDU_DIR}, "757Avionics/" + cdu + "/legs"},
-                        {std::vector<FMCKey>{FMCKey::PFP_DEP_ARR, FMCKey::MCDU_AIRPORT}, "757Avionics/" + cdu + "/dep_arr"},
-                        {FMCKey::PFP_HOLD, "757Avionics/" + cdu + "/hold"},
-                        {FMCKey::PROG, "757Avionics/" + cdu + "/prog"},
-                        {std::vector<FMCKey>{FMCKey::PFP_EXEC, FMCKey::MCDU_EMPTY_TOP_RIGHT}, "757Avionics/" + cdu + "/exec"},
-                        {std::vector<FMCKey>{FMCKey::PFP3_N1_LIMIT, FMCKey::MCDU_PERF}, "757Avionics/" + cdu + "/dir"},
-                        {std::vector<FMCKey>{FMCKey::PFP_FIX, FMCKey::MCDU_EMPTY_BOTTOM_LEFT}, "757Avionics/" + cdu + "/fix"},
-                        {FMCKey::PAGE_PREV, "757Avionics/" + cdu + "/prev_page"},
-                        {FMCKey::PAGE_NEXT, "757Avionics/" + cdu + "/next_page"},
-                        {FMCKey::KEY1, "757Avionics/" + cdu + "/1"},
-                        {FMCKey::KEY2, "757Avionics/" + cdu + "/2"},
-                        {FMCKey::KEY3, "757Avionics/" + cdu + "/3"},
-                        {FMCKey::KEY4, "757Avionics/" + cdu + "/4"},
-                        {FMCKey::KEY5, "757Avionics/" + cdu + "/5"},
-                        {FMCKey::KEY6, "757Avionics/" + cdu + "/6"},
-                        {FMCKey::KEY7, "757Avionics/" + cdu + "/7"},
-                        {FMCKey::KEY8, "757Avionics/" + cdu + "/8"},
-                        {FMCKey::KEY9, "757Avionics/" + cdu + "/9"},
-                        {FMCKey::PERIOD, "757Avionics/" + cdu + "/point"},
-                        {FMCKey::KEY0, "757Avionics/" + cdu + "/0"},
-                        {FMCKey::PLUSMINUS, "757Avionics/" + cdu + "/plusminus"},
-                        {FMCKey::KEYA, "757Avionics/" + cdu + "/A"},
-                        {FMCKey::KEYB, "757Avionics/" + cdu + "/B"},
-                        {FMCKey::KEYC, "757Avionics/" + cdu + "/C"},
-                        {FMCKey::KEYD, "757Avionics/" + cdu + "/D"},
-                        {FMCKey::KEYE, "757Avionics/" + cdu + "/E"},
-                        {FMCKey::KEYF, "757Avionics/" + cdu + "/F"},
-                        {FMCKey::KEYG, "757Avionics/" + cdu + "/G"},
-                        {FMCKey::KEYH, "757Avionics/" + cdu + "/H"},
-                        {FMCKey::KEYI, "757Avionics/" + cdu + "/I"},
-                        {FMCKey::KEYJ, "757Avionics/" + cdu + "/J"},
-                        {FMCKey::KEYK, "757Avionics/" + cdu + "/K"},
-                        {FMCKey::KEYL, "757Avionics/" + cdu + "/L"},
-                        {FMCKey::KEYM, "757Avionics/" + cdu + "/M"},
-                        {FMCKey::KEYN, "757Avionics/" + cdu + "/N"},
-                        {FMCKey::KEYO, "757Avionics/" + cdu + "/O"},
-                        {FMCKey::KEYP, "757Avionics/" + cdu + "/P"},
-                        {FMCKey::KEYQ, "757Avionics/" + cdu + "/Q"},
-                        {FMCKey::KEYR, "757Avionics/" + cdu + "/R"},
-                        {FMCKey::KEYS, "757Avionics/" + cdu + "/S"},
-                        {FMCKey::KEYT, "757Avionics/" + cdu + "/T"},
-                        {FMCKey::KEYU, "757Avionics/" + cdu + "/U"},
-                        {FMCKey::KEYV, "757Avionics/" + cdu + "/V"},
-                        {FMCKey::KEYW, "757Avionics/" + cdu + "/W"},
-                        {FMCKey::KEYX, "757Avionics/" + cdu + "/X"},
-                        {FMCKey::KEYY, "757Avionics/" + cdu + "/Y"},
-                        {FMCKey::KEYZ, "757Avionics/" + cdu + "/Z"},
-                        {FMCKey::SPACE, "757Avionics/" + cdu + "/space"},
-                        {std::vector<FMCKey>{FMCKey::PFP_DEL, FMCKey::MCDU_OVERFLY}, "757Avionics/" + cdu + "/delete"},
-                        {FMCKey::SLASH, "757Avionics/" + cdu + "/slash"},
-                        {FMCKey::CLR, "757Avionics/" + cdu + "/clear"}})
+                        {FMCKey::LSK1L, "757Avionics/" + cdu + "/LLSK1", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK2L, "757Avionics/" + cdu + "/LLSK2", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK3L, "757Avionics/" + cdu + "/LLSK3", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK4L, "757Avionics/" + cdu + "/LLSK4", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK5L, "757Avionics/" + cdu + "/LLSK5", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK6L, "757Avionics/" + cdu + "/LLSK6", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK1R, "757Avionics/" + cdu + "/RLSK1", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK2R, "757Avionics/" + cdu + "/RLSK2", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK3R, "757Avionics/" + cdu + "/RLSK3", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK4R, "757Avionics/" + cdu + "/RLSK4", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK5R, "757Avionics/" + cdu + "/RLSK5", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::LSK6R, "757Avionics/" + cdu + "/RLSK6", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_INIT_REF, FMCKey::MCDU_INIT}, "757Avionics/" + cdu + "/init_ref", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_ROUTE, FMCKey::MCDU_SEC_FPLN}, "757Avionics/" + cdu + "/rte", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PFP3_CLB, "757Avionics/" + cdu + "/clb", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PFP3_CRZ, "757Avionics/" + cdu + "/crz", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PFP3_DES, "757Avionics/" + cdu + "/des", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::BRIGHTNESS_DOWN, "ixeg/733/rheostats/light_fmc_pt_act", FMCDatarefType::ADJUST_VALUE, -0.1},
+                        {FMCKey::BRIGHTNESS_UP, "ixeg/733/rheostats/light_fmc_pt_act", FMCDatarefType::ADJUST_VALUE, 0.1},
+                        {FMCKey::MENU, "757Avionics/" + cdu + "/mcdu_menu", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_LEGS, FMCKey::MCDU_FPLN, FMCKey::MCDU_DIR}, "757Avionics/" + cdu + "/legs", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_DEP_ARR, FMCKey::MCDU_AIRPORT}, "757Avionics/" + cdu + "/dep_arr", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PFP_HOLD, "757Avionics/" + cdu + "/hold", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PROG, "757Avionics/" + cdu + "/prog", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_EXEC, FMCKey::MCDU_EMPTY_TOP_RIGHT}, "757Avionics/" + cdu + "/exec", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP3_N1_LIMIT, FMCKey::MCDU_PERF}, "757Avionics/" + cdu + "/dir", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_FIX, FMCKey::MCDU_EMPTY_BOTTOM_LEFT}, "757Avionics/" + cdu + "/fix", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PAGE_PREV, "757Avionics/" + cdu + "/prev_page", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PAGE_NEXT, "757Avionics/" + cdu + "/next_page", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY1, "757Avionics/" + cdu + "/1", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY2, "757Avionics/" + cdu + "/2", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY3, "757Avionics/" + cdu + "/3", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY4, "757Avionics/" + cdu + "/4", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY5, "757Avionics/" + cdu + "/5", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY6, "757Avionics/" + cdu + "/6", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY7, "757Avionics/" + cdu + "/7", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY8, "757Avionics/" + cdu + "/8", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY9, "757Avionics/" + cdu + "/9", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PERIOD, "757Avionics/" + cdu + "/point", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEY0, "757Avionics/" + cdu + "/0", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::PLUSMINUS, "757Avionics/" + cdu + "/plusminus", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYA, "757Avionics/" + cdu + "/A", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYB, "757Avionics/" + cdu + "/B", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYC, "757Avionics/" + cdu + "/C", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYD, "757Avionics/" + cdu + "/D", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYE, "757Avionics/" + cdu + "/E", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYF, "757Avionics/" + cdu + "/F", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYG, "757Avionics/" + cdu + "/G", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYH, "757Avionics/" + cdu + "/H", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYI, "757Avionics/" + cdu + "/I", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYJ, "757Avionics/" + cdu + "/J", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYK, "757Avionics/" + cdu + "/K", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYL, "757Avionics/" + cdu + "/L", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYM, "757Avionics/" + cdu + "/M", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYN, "757Avionics/" + cdu + "/N", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYO, "757Avionics/" + cdu + "/O", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYP, "757Avionics/" + cdu + "/P", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYQ, "757Avionics/" + cdu + "/Q", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYR, "757Avionics/" + cdu + "/R", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYS, "757Avionics/" + cdu + "/S", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYT, "757Avionics/" + cdu + "/T", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYU, "757Avionics/" + cdu + "/U", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYV, "757Avionics/" + cdu + "/V", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYW, "757Avionics/" + cdu + "/W", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYX, "757Avionics/" + cdu + "/X", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYY, "757Avionics/" + cdu + "/Y", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::KEYZ, "757Avionics/" + cdu + "/Z", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::SPACE, "757Avionics/" + cdu + "/space", FMCDatarefType::SET_VALUE_PHASED},
+                        {std::vector<FMCKey>{FMCKey::PFP_DEL, FMCKey::MCDU_OVERFLY}, "757Avionics/" + cdu + "/delete", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::SLASH, "757Avionics/" + cdu + "/slash", FMCDatarefType::SET_VALUE_PHASED},
+                        {FMCKey::CLR, "757Avionics/" + cdu + "/clear", FMCDatarefType::SET_VALUE_PHASED}})
         .first->second;
 }
 
@@ -174,7 +170,8 @@ const std::map<char, FMCTextColor> &FlightFactor767FMCProfile::colorMap() const 
         {3, FMCTextColor::COLOR_GREEN},
         {4, FMCTextColor::COLOR_CYAN},
         {5, FMCTextColor::COLOR_GREY},
-        {6, FMCTextColor::COLOR_WHITE_BG}};
+        {6, FMCTextColor::withBackgroundColor(FMCTextColor::COLOR_WHITE, FMCTextColor::COLOR_GREY)},
+    };
     return colMap;
 }
 
@@ -237,9 +234,35 @@ void FlightFactor767FMCProfile::updatePage(std::vector<std::vector<char>> &page)
 }
 
 void FlightFactor767FMCProfile::buttonPressed(const FMCButtonDef *button, XPLMCommandPhase phase) {
-    if (phase == xplm_CommandContinue) {
+    if (!button || button->dataref.empty() || phase == xplm_CommandContinue) {
         return;
     }
 
-    Dataref::getInstance()->set<float>(button->dataref.c_str(), phase == xplm_CommandBegin ? 1 : 0);
+    auto datarefManager = Dataref::getInstance();
+    if (button->datarefType == FMCDatarefType::SET_VALUE || button->datarefType == FMCDatarefType::SET_VALUE_PHASED) {
+        double value = std::fabs(button->value) < std::numeric_limits<double>::epsilon() ? 1.0 : button->value;
+        if (button->datarefType == FMCDatarefType::SET_VALUE && phase != xplm_CommandBegin) {
+            return;
+        }
+
+        datarefManager->set<double>(button->dataref.c_str(), phase == xplm_CommandBegin ? value : 0.0);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::ADJUST_VALUE) {
+        double currentValue = datarefManager->get<double>(button->dataref.c_str());
+        datarefManager->set<double>(button->dataref.c_str(), currentValue + button->value);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_MULTIPLE_CMD_ONCE) {
+        std::stringstream ss(button->dataref);
+        std::string item;
+        std::vector<std::string> commands;
+        while (std::getline(ss, item, ',')) {
+            commands.push_back(item);
+        }
+
+        for (const auto &cmd : commands) {
+            datarefManager->executeCommand(cmd.c_str());
+        }
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_CMD_ONCE) {
+        datarefManager->executeCommand(button->dataref.c_str());
+    } else {
+        datarefManager->executeCommand(button->dataref.c_str(), phase);
+    }
 }

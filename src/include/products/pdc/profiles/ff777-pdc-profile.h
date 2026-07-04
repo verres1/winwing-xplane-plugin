@@ -8,11 +8,11 @@
 class FF777PDCProfile : public PDCAircraftProfile {
     public:
         FF777PDCProfile(ProductPDC *product);
-        ~FF777PDCProfile();
 
         static bool IsEligible();
-        const std::unordered_map<uint16_t, PDCButtonDef> &buttonDefs() const override;
+        const std::unordered_map<PDCButtonIndex3N3M, PDCButtonDef> &buttonDefs() const override;
 
+        void update() override;
         void buttonPressed(const PDCButtonDef *button, XPLMCommandPhase phase) override;
 };
 

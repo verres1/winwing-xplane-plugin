@@ -4,12 +4,17 @@
 #include "dataref.h"
 #include "plugins-menu.h"
 #include "profiles/ff777-pdc-profile.h"
+#include "profiles/fps748-pdc-profile.h"
+#include "profiles/xcrafts-ejets-pdc-profile.h"
+#include "profiles/xcrafts-erj-pdc-profile.h"
 #include "profiles/zibo-pdc-profile.h"
 
 #include <algorithm>
 #include <cmath>
 
 ProductPDC::ProductPDC(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName, PDCDeviceVariant variant, unsigned char identifierByte) : USBDevice(hidDevice, vendorId, productId, vendorName, productName), identifierByte(identifierByte), deviceVariant(variant) {
+    profile = nullptr;
+    menuItemId = -1;
     lastButtonStateLo = 0;
     lastButtonStateHi = 0;
     pressedButtonIndices = {};
@@ -18,15 +23,36 @@ ProductPDC::ProductPDC(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t pr
 }
 
 ProductPDC::~ProductPDC() {
-    disconnect();
+    AppState::getInstance()->cancelTasksForOwner(this);
+    blackout();
+
+    PluginsMenu::getInstance()->removeItem(menuItemId);
+
+    if (profile) {
+        delete profile;
+        profile = nullptr;
+    }
 }
 
 const char *ProductPDC::classIdentifier() {
     return "PDC";
 }
 
+const char *ProductPDC::activeProfileName() const {
+    return profile ? typeid(*profile).name() : "none";
+}
+
 void ProductPDC::setProfileForCurrentAircraft() {
-    if (ZiboPDCProfile::IsEligible()) {
+    if (FPS748PDCProfile::IsEligible()) {
+        profile = new FPS748PDCProfile(this);
+        profileReady = true;
+    } else if (XCraftsErjPDCProfile::IsEligible()) {
+        profile = new XCraftsErjPDCProfile(this);
+        profileReady = true;
+    } else if (XCraftsEjetsPDCProfile::IsEligible()) {
+        profile = new XCraftsEjetsPDCProfile(this);
+        profileReady = true;
+    } else if (ZiboPDCProfile::IsEligible()) {
         profile = new ZiboPDCProfile(this);
         profileReady = true;
     } else if (FF777PDCProfile::IsEligible()) {
@@ -52,9 +78,9 @@ bool ProductPDC::connect() {
         std::vector<MenuItem>{
             {.name = "Identify", .content = [this](int menuId) {
                  setLedBrightness(PDCLed::BACKLIGHT, 255);
-                 AppState::getInstance()->executeAfter(1000, [this]() {
+                 AppState::getInstance()->executeAfter(1000, this, [this]() {
                      setLedBrightness(PDCLed::BACKLIGHT, 0);
-                     AppState::getInstance()->executeAfter(1000, [this]() {
+                     AppState::getInstance()->executeAfter(1000, this, [this]() {
                          setLedBrightness(PDCLed::BACKLIGHT, 128);
                      });
                  });
@@ -64,21 +90,24 @@ bool ProductPDC::connect() {
     return true;
 }
 
-void ProductPDC::disconnect() {
+void ProductPDC::blackout() {
     setLedBrightness(PDCLed::BACKLIGHT, 0);
-
-    PluginsMenu::getInstance()->removeItem(menuItemId);
-
-    if (profile) {
-        delete profile;
-        profile = nullptr;
-    }
-
-    USBDevice::disconnect();
 }
 
 void ProductPDC::setLedBrightness(PDCLed led, uint8_t brightness) {
     writeData({0x02, identifierByte, 0xBB, 0x00, 0x00, 0x03, 0x49, static_cast<uint8_t>(led), brightness, 0x00, 0x00, 0x00, 0x00, 0x00});
+}
+
+void ProductPDC::update() {
+    if (!connected) {
+        return;
+    }
+
+    USBDevice::update();
+
+    if (profile) {
+        profile->update();
+    }
 }
 
 void ProductPDC::didReceiveData(int reportId, uint8_t *report, int reportLength) {
@@ -130,18 +159,26 @@ void ProductPDC::didReceiveData(int reportId, uint8_t *report, int reportLength)
 void ProductPDC::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count) {
     USBDevice::didReceiveButton(hardwareButtonIndex, pressed, count);
 
+    if (!connected || !profile) {
+        return;
+    }
+
+    if (isButtonHandledByXPlane(hardwareButtonIndex)) {
+        return;
+    }
+
+    bool isDeviceVariant3N = deviceVariant == PDCDeviceVariant::VARIANT_3N_CAPTAIN || deviceVariant == PDCDeviceVariant::VARIANT_3N_FIRSTOFFICER;
+
     auto &buttons = profile->buttonDefs();
-    auto it = buttons.find(hardwareButtonIndex);
+    auto it = std::find_if(buttons.begin(), buttons.end(), [hardwareButtonIndex, isDeviceVariant3N](const auto &kv) {
+        return isDeviceVariant3N ? kv.first.first == hardwareButtonIndex : kv.first.second == hardwareButtonIndex;
+    });
+
     if (it == buttons.end()) {
         return;
     }
 
     const PDCButtonDef *buttonDef = &it->second;
-
-    if (pressed && (deviceVariant == PDCDeviceVariant::VARIANT_3N_CAPTAIN || deviceVariant == PDCDeviceVariant::VARIANT_3N_FIRSTOFFICER)) {
-        debug_force("PDC Button pressed for 3NPDC: %i - mapped as %s\n", hardwareButtonIndex, buttonDef->name.c_str());
-    }
-
     if (buttonDef->dataref.empty()) {
         return;
     }

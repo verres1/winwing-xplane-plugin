@@ -1,47 +1,48 @@
-#include <cstdio>
-#include <algorithm>
-#include <XPLMProcessing.h>
-#include <XPLMUtilities.h>
-#include <XPLMDisplay.h>
-#include <XPLMDataAccess.h>
-#include <XPLMMenus.h>
 #include "dataref.h"
-#include <vector>
+
+#include <algorithm>
+#include <cstdio>
+#include <cstring>
+#include <ctime>
 #include <string>
 #include <unordered_map>
 #include <variant>
-#include <cstring>
-#include <ctime>
+#include <vector>
+#include <XPLMDataAccess.h>
+#include <XPLMDisplay.h>
+#include <XPLMMenus.h>
+#include <XPLMProcessing.h>
+#include <XPLMUtilities.h>
 
 // Forward declarations for XPLM types (they are defined as void* in the actual headers)
-typedef void* XPLMCommandRef;
-typedef void* XPLMDataRef;
+typedef void *XPLMCommandRef;
+typedef void *XPLMDataRef;
 typedef int XPLMDataTypeID;
 typedef int (*XPLMCommandCallback_f)(XPLMCommandRef inCommand, int inPhase, void *inRefcon);
 
 // Data type constants matching XPLM
-#define xplmType_Unknown       0
-#define xplmType_Int           1
-#define xplmType_Float         2
-#define xplmType_Double        4
-#define xplmType_FloatArray    8
-#define xplmType_IntArray      16
-#define xplmType_Data          32
+#define xplmType_Unknown 0
+#define xplmType_Int 1
+#define xplmType_Float 2
+#define xplmType_Double 4
+#define xplmType_FloatArray 8
+#define xplmType_IntArray 16
+#define xplmType_Data 32
 
 // Mock dataref storage using a union-like approach
 struct MockDataRef {
-    std::string name;
-    XPLMDataTypeID type;
-    
-    // Storage for different data types
-    int intValue;
-    float floatValue;
-    double doubleValue;
-    std::vector<int> intArrayValue;
-    std::vector<float> floatArrayValue;
-    std::vector<unsigned char> dataValue;
-    
-    MockDataRef(const std::string& n, XPLMDataTypeID t) : name(n), type(t), intValue(0), floatValue(0.0f), doubleValue(0.0) {}
+        std::string name;
+        XPLMDataTypeID type;
+
+        // Storage for different data types
+        int intValue;
+        float floatValue;
+        double doubleValue;
+        std::vector<int> intArrayValue;
+        std::vector<float> floatArrayValue;
+        std::vector<unsigned char> dataValue;
+
+        MockDataRef(const std::string &n, XPLMDataTypeID t) : name(n), type(t), intValue(0), floatValue(0.0f), doubleValue(0.0) {}
 };
 
 // Helper function to create a dataref handle from an index
@@ -67,9 +68,9 @@ void clearAllMockDataRefs() {
 }
 
 // Utility function to create a dataref with a specific type (for testing purposes)
-XPLMDataRef createMockDataRef(const char* name, XPLMDataTypeID type) {
+XPLMDataRef createMockDataRef(const char *name, XPLMDataTypeID type) {
     std::string nameStr(name);
-    
+
     // Check if it already exists
     auto it = dataRefNameToIndex.find(nameStr);
     if (it != dataRefNameToIndex.end()) {
@@ -77,29 +78,29 @@ XPLMDataRef createMockDataRef(const char* name, XPLMDataTypeID type) {
         mockDataRefs[it->second].type = type;
         return indexToDataRefHandle(it->second);
     }
-    
+
     mockDataRefs.emplace_back(nameStr, type);
     size_t index = mockDataRefs.size() - 1;
     dataRefNameToIndex[nameStr] = index;
-    
+
     return indexToDataRefHandle(index);
 }
 
 // Helper function to create a dataref with type inference based on name patterns
-XPLMDataRef createMockDataRefWithInference(const char* name, XPLMDataTypeID preferredType) {
+XPLMDataRef createMockDataRefWithInference(const char *name, XPLMDataTypeID preferredType) {
     std::string nameStr(name);
-    
+
     // Start with the preferred type
     XPLMDataTypeID defaultType = preferredType;
-    
+
     // Try to infer type from common dataref patterns if no preferred type
     if (defaultType == xplmType_Unknown) {
-        if (nameStr.find("_int") != std::string::npos || 
+        if (nameStr.find("_int") != std::string::npos ||
             nameStr.find("Count") != std::string::npos ||
             nameStr.find("_enum") != std::string::npos ||
             nameStr.find("_bool") != std::string::npos) {
             defaultType = xplmType_Int;
-        } else if (nameStr.find("Array") != std::string::npos || 
+        } else if (nameStr.find("Array") != std::string::npos ||
                    nameStr.find("array") != std::string::npos ||
                    nameStr.find("DUBrightness") != std::string::npos) {
             defaultType = xplmType_FloatArray;
@@ -109,40 +110,42 @@ XPLMDataRef createMockDataRefWithInference(const char* name, XPLMDataTypeID pref
             defaultType = xplmType_Float; // Default fallback
         }
     }
-    
+
     // Special handling for known datarefs
     if (nameStr == "AirbusFBW/DUBrightness") {
         defaultType = xplmType_FloatArray;
     } else if (nameStr == "AirbusFBW/PanelBrightnessLevel") {
         defaultType = xplmType_Float;
     }
-    
+
     return createMockDataRef(name, defaultType);
 }
 
 // Helper function to get or create a dataref from a handle, creating it if it doesn't exist
-MockDataRef* getOrCreateDataRefFromHandle(XPLMDataRef ref, XPLMDataTypeID preferredType = xplmType_Unknown) {
-    if (!ref) return nullptr;
-    
+MockDataRef *getOrCreateDataRefFromHandle(XPLMDataRef ref, XPLMDataTypeID preferredType = xplmType_Unknown) {
+    if (!ref) {
+        return nullptr;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
     if (index < mockDataRefs.size()) {
         return &mockDataRefs[index];
     }
-    
+
     // If we get here, the handle is invalid - this shouldn't happen in normal operation
     return nullptr;
 }
 
 // Helper function to get or create a dataref by name for setters
-MockDataRef* getOrCreateDataRefByName(const char* name, XPLMDataTypeID preferredType) {
+MockDataRef *getOrCreateDataRefByName(const char *name, XPLMDataTypeID preferredType) {
     std::string nameStr(name);
-    
+
     // Check if it already exists
     auto it = dataRefNameToIndex.find(nameStr);
     if (it != dataRefNameToIndex.end()) {
         return &mockDataRefs[it->second];
     }
-    
+
     // Create it with the preferred type
     XPLMDataRef ref = createMockDataRefWithInference(name, preferredType);
     size_t index = dataRefHandleToIndex(ref);
@@ -195,66 +198,78 @@ XPLMCommandRef XPLMFindCommand(const char *name) {
     std::string nameStr(name);
     auto it = std::find(registeredCommands.begin(), registeredCommands.end(), nameStr);
     if (it != registeredCommands.end()) {
-        return (XPLMCommandRef)(std::distance(registeredCommands.begin(), it) + 1);
+        return (XPLMCommandRef) (std::distance(registeredCommands.begin(), it) + 1);
     }
     registeredCommands.push_back(nameStr);
-    return (XPLMCommandRef)registeredCommands.size();
+    return (XPLMCommandRef) registeredCommands.size();
 }
 
 XPLMDataRef XPLMFindDataRef(const char *name) {
     std::string nameStr(name);
-    
+
     // Check if we already have this dataref
     auto it = dataRefNameToIndex.find(nameStr);
     if (it != dataRefNameToIndex.end()) {
         return indexToDataRefHandle(it->second);
     }
-    
+
     return nullptr;
 }
 
 XPLMDataTypeID XPLMGetDataRefTypes(XPLMDataRef ref) {
-    if (!ref) return xplmType_Unknown;
-    
+    if (!ref) {
+        return xplmType_Unknown;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
     if (index >= mockDataRefs.size()) {
         return xplmType_Unknown;
     }
-    
+
     return mockDataRefs[index].type;
 }
 
 int XPLMGetDatab(XPLMDataRef ref, void *outValue, int offset, int maxBytes) {
-    if (!ref) return 0;
-    
+    if (!ref) {
+        return 0;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return 0;
-    
-    MockDataRef& dataref = mockDataRefs[index];
-    if (dataref.type != xplmType_Data) return 0;
-    
+    if (index >= mockDataRefs.size()) {
+        return 0;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
+    if (dataref.type != xplmType_Data) {
+        return 0;
+    }
+
     // If outValue is null, return total size (X-Plane SDK behavior)
     if (!outValue) {
         return static_cast<int>(dataref.dataValue.size());
     }
-    
+
     size_t availableBytes = dataref.dataValue.size() - offset;
     size_t bytesToCopy = std::min(static_cast<size_t>(maxBytes), availableBytes);
-    
+
     if (bytesToCopy > 0) {
         memcpy(outValue, dataref.dataValue.data() + offset, bytesToCopy);
     }
-    
+
     return static_cast<int>(bytesToCopy);
 }
 
 float XPLMGetDataf(XPLMDataRef ref) {
-    if (!ref) return 0.0f;
-    
+    if (!ref) {
+        return 0.0f;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return 0.0f;
-    
-    MockDataRef& dataref = mockDataRefs[index];
+    if (index >= mockDataRefs.size()) {
+        return 0.0f;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
     switch (dataref.type) {
         case xplmType_Float:
             return dataref.floatValue;
@@ -268,12 +283,16 @@ float XPLMGetDataf(XPLMDataRef ref) {
 }
 
 double XPLMGetDatad(XPLMDataRef ref) {
-    if (!ref) return 0.0;
-    
+    if (!ref) {
+        return 0.0;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return 0.0;
-    
-    MockDataRef& dataref = mockDataRefs[index];
+    if (index >= mockDataRefs.size()) {
+        return 0.0;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
     switch (dataref.type) {
         case xplmType_Float:
             return dataref.floatValue;
@@ -287,12 +306,16 @@ double XPLMGetDatad(XPLMDataRef ref) {
 }
 
 int XPLMGetDatai(XPLMDataRef ref) {
-    if (!ref) return 0;
-    
+    if (!ref) {
+        return 0;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return 0;
-    
-    MockDataRef& dataref = mockDataRefs[index];
+    if (index >= mockDataRefs.size()) {
+        return 0;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
     switch (dataref.type) {
         case xplmType_Int:
             return dataref.intValue;
@@ -306,50 +329,62 @@ int XPLMGetDatai(XPLMDataRef ref) {
 }
 
 int XPLMGetDatavf(XPLMDataRef ref, float *values, int offset, int max) {
-    if (!ref) return 0;
-    
+    if (!ref) {
+        return 0;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return 0;
-    
-    MockDataRef& dataref = mockDataRefs[index];
-    if (dataref.type != xplmType_FloatArray) return 0;
-    
+    if (index >= mockDataRefs.size()) {
+        return 0;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
+    if (dataref.type != xplmType_FloatArray) {
+        return 0;
+    }
+
     // If values is null, return total size (X-Plane SDK behavior)
     if (!values) {
         return static_cast<int>(dataref.floatArrayValue.size());
     }
-    
+
     size_t availableValues = dataref.floatArrayValue.size() - offset;
     size_t valuesToCopy = std::min(static_cast<size_t>(max), availableValues);
-    
+
     if (valuesToCopy > 0) {
         memcpy(values, dataref.floatArrayValue.data() + offset, valuesToCopy * sizeof(float));
     }
-    
+
     return static_cast<int>(valuesToCopy);
 }
 
 int XPLMGetDatavi(XPLMDataRef ref, int *values, int offset, int max) {
-    if (!ref) return 0;
-    
+    if (!ref) {
+        return 0;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return 0;
-    
-    MockDataRef& dataref = mockDataRefs[index];
-    if (dataref.type != xplmType_IntArray) return 0;
-    
+    if (index >= mockDataRefs.size()) {
+        return 0;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
+    if (dataref.type != xplmType_IntArray) {
+        return 0;
+    }
+
     // If values is null, return total size (X-Plane SDK behavior)
     if (!values) {
         return static_cast<int>(dataref.intArrayValue.size());
     }
-    
+
     size_t availableValues = dataref.intArrayValue.size() - offset;
     size_t valuesToCopy = std::min(static_cast<size_t>(max), availableValues);
-    
+
     if (valuesToCopy > 0) {
         memcpy(values, dataref.intArrayValue.data() + offset, valuesToCopy * sizeof(int));
     }
-    
+
     return static_cast<int>(valuesToCopy);
 }
 
@@ -367,12 +402,16 @@ void XPLMUnregisterDataAccessor(XPLMDataRef ref) {
 }
 
 void XPLMSetDatai(XPLMDataRef ref, int value) {
-    if (!ref) return;
-    
+    if (!ref) {
+        return;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return;
-    
-    MockDataRef& dataref = mockDataRefs[index];
+    if (index >= mockDataRefs.size()) {
+        return;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
     switch (dataref.type) {
         case xplmType_Int:
             dataref.intValue = value;
@@ -390,12 +429,16 @@ void XPLMSetDatai(XPLMDataRef ref, int value) {
 }
 
 void XPLMSetDataf(XPLMDataRef ref, float value) {
-    if (!ref) return;
-    
+    if (!ref) {
+        return;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return;
-    
-    MockDataRef& dataref = mockDataRefs[index];
+    if (index >= mockDataRefs.size()) {
+        return;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
     switch (dataref.type) {
         case xplmType_Float:
             dataref.floatValue = value;
@@ -413,12 +456,16 @@ void XPLMSetDataf(XPLMDataRef ref, float value) {
 }
 
 void XPLMSetDatad(XPLMDataRef ref, double value) {
-    if (!ref) return;
-    
+    if (!ref) {
+        return;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return;
-    
-    MockDataRef& dataref = mockDataRefs[index];
+    if (index >= mockDataRefs.size()) {
+        return;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
     switch (dataref.type) {
         case xplmType_Float:
             dataref.floatValue = value;
@@ -436,65 +483,77 @@ void XPLMSetDatad(XPLMDataRef ref, double value) {
 }
 
 void XPLMSetDatab(XPLMDataRef ref, void *inValue, int inOffset, int inLength) {
-    if (!ref || !inValue) return;
-    
+    if (!ref || !inValue) {
+        return;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return;
-    
-    MockDataRef& dataref = mockDataRefs[index];
+    if (index >= mockDataRefs.size()) {
+        return;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
     if (dataref.type != xplmType_Data) {
         printf("Cannot set data bytes on dataref '%s' of type %d\n", dataref.name.c_str(), dataref.type);
         return;
     }
-    
+
     // Resize if necessary
     size_t requiredSize = inOffset + inLength;
     if (dataref.dataValue.size() < requiredSize) {
         dataref.dataValue.resize(requiredSize);
     }
-    
+
     memcpy(dataref.dataValue.data() + inOffset, inValue, inLength);
 }
 
 void XPLMSetDatavi(XPLMDataRef ref, int *inValues, int inOffset, int inCount) {
-    if (!ref || !inValues) return;
-    
+    if (!ref || !inValues) {
+        return;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return;
-    
-    MockDataRef& dataref = mockDataRefs[index];
+    if (index >= mockDataRefs.size()) {
+        return;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
     if (dataref.type != xplmType_IntArray) {
         printf("Cannot set int array on dataref '%s' of type %d\n", dataref.name.c_str(), dataref.type);
         return;
     }
-    
+
     // Resize if necessary
     size_t requiredSize = inOffset + inCount;
     if (dataref.intArrayValue.size() < requiredSize) {
         dataref.intArrayValue.resize(requiredSize);
     }
-    
+
     memcpy(dataref.intArrayValue.data() + inOffset, inValues, inCount * sizeof(int));
 }
 
 void XPLMSetDatavf(XPLMDataRef ref, float *inValues, int inOffset, int inCount) {
-    if (!ref || !inValues) return;
-    
+    if (!ref || !inValues) {
+        return;
+    }
+
     size_t index = dataRefHandleToIndex(ref);
-    if (index >= mockDataRefs.size()) return;
-    
-    MockDataRef& dataref = mockDataRefs[index];
+    if (index >= mockDataRefs.size()) {
+        return;
+    }
+
+    MockDataRef &dataref = mockDataRefs[index];
     if (dataref.type != xplmType_FloatArray) {
         printf("Cannot set float array on dataref '%s' of type %d\n", dataref.name.c_str(), dataref.type);
         return;
     }
-    
+
     // Resize if necessary
     size_t requiredSize = inOffset + inCount;
     if (dataref.floatArrayValue.size() < requiredSize) {
         dataref.floatArrayValue.resize(requiredSize);
     }
-    
+
     memcpy(dataref.floatArrayValue.data() + inOffset, inValues, inCount * sizeof(float));
 }
 
@@ -515,18 +574,15 @@ XPLMDataRef XPLMRegisterDataAccessor(
     XPLMGetDatab_f inReadData,
     XPLMSetDatab_f inWriteData,
     void *inReadRefcon,
-    void *inWriteRefcon)
-{
+    void *inWriteRefcon) {
     printf("Registering data accessor: %s\n", inDataName);
     return 0;
 }
 
 void XPLMRegisterFlightLoopCallback(XPLMFlightLoop_f inFlightLoop, float inInterval, void *inRefcon) {
-    
 }
 
 void XPLMUnregisterFlightLoopCallback(XPLMFlightLoop_f inFlightLoop, void *inRefcon) {
-    
 }
 
 int XPLMGetCycleNumber() {
@@ -572,4 +628,12 @@ void XPLMRemoveMenuItem(XPLMMenuID inMenu, int inIndex) {
 
 void XPLMSetMenuItemName(XPLMMenuID inMenu, int inIndex, const char *inItemName, int dep) {
     // noop
+}
+
+void XPLMAppendMenuSeparator(XPLMMenuID inMenu) {
+    // noop
+}
+
+float XPLMGetElapsedTime() {
+    return 1.0f;
 }

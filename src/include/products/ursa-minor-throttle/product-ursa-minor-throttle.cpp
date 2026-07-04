@@ -3,13 +3,20 @@
 #include "appstate.h"
 #include "dataref.h"
 #include "plugins-menu.h"
+#include "profiles/ff777-ursa-minor-throttle-profile.h"
+#include "profiles/rotatemd11-ursa-minor-throttle-profile.h"
 #include "profiles/toliss-ursa-minor-throttle-profile.h"
+#include "profiles/xcrafts-ejets-ursa-minor-throttle-profile.h"
+#include "profiles/xcrafts-erj-ursa-minor-throttle-profile.h"
+#include "profiles/zibo-ursa-minor-throttle-profile.h"
 #include "segment-display.h"
 
 #include <algorithm>
 #include <cmath>
 
 ProductUrsaMinorThrottle::ProductUrsaMinorThrottle(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName) : USBDevice(hidDevice, vendorId, productId, vendorName, productName) {
+    profile = nullptr;
+    menuItemId = -1;
     lastButtonStateLo = 0;
     lastButtonStateHi = 0;
     pressedButtonIndices = {};
@@ -18,16 +25,43 @@ ProductUrsaMinorThrottle::ProductUrsaMinorThrottle(HIDDeviceHandle hidDevice, ui
 }
 
 ProductUrsaMinorThrottle::~ProductUrsaMinorThrottle() {
-    disconnect();
+    AppState::getInstance()->cancelTasksForOwner(this);
+    blackout();
+
+    PluginsMenu::getInstance()->removeItem(menuItemId);
+
+    if (profile) {
+        delete profile;
+        profile = nullptr;
+    }
 }
 
 const char *ProductUrsaMinorThrottle::classIdentifier() {
     return "Ursa Minor Throttle";
 }
 
+const char *ProductUrsaMinorThrottle::activeProfileName() const {
+    return profile ? typeid(*profile).name() : "none";
+}
+
 void ProductUrsaMinorThrottle::setProfileForCurrentAircraft() {
     if (TolissUrsaMinorThrottleProfile::IsEligible()) {
         profile = new TolissUrsaMinorThrottleProfile(this);
+        profileReady = true;
+    } else if (RotateMD11UrsaMinorThrottleProfile::IsEligible()) {
+        profile = new RotateMD11UrsaMinorThrottleProfile(this);
+        profileReady = true;
+    } else if (XCraftsErjUrsaMinorThrottleProfile::IsEligible()) {
+        profile = new XCraftsErjUrsaMinorThrottleProfile(this);
+        profileReady = true;
+    } else if (XCraftsEjetsUrsaMinorThrottleProfile::IsEligible()) {
+        profile = new XCraftsEjetsUrsaMinorThrottleProfile(this);
+        profileReady = true;
+    } else if (FF777UrsaMinorThrottleProfile::IsEligible()) {
+        profile = new FF777UrsaMinorThrottleProfile(this);
+        profileReady = true;
+    } else if (ZiboUrsaMinorThrottleProfile::IsEligible()) {
+        profile = new ZiboUrsaMinorThrottleProfile(this);
         profileReady = true;
     } else {
         profile = nullptr;
@@ -56,7 +90,7 @@ bool ProductUrsaMinorThrottle::connect() {
                  setLedBrightness(UrsaMinorThrottleLed::BACKLIGHT, 128);
                  setLedBrightness(UrsaMinorThrottleLed::OVERALL_LEDS_AND_LCD_BRIGHTNESS, 255);
                  setAllLedsEnabled(true);
-                 AppState::getInstance()->executeAfter(2000, [this]() {
+                 AppState::getInstance()->executeAfter(2000, this, [this]() {
                      setAllLedsEnabled(false);
                  });
              }},
@@ -86,18 +120,11 @@ bool ProductUrsaMinorThrottle::connect() {
     return true;
 }
 
-void ProductUrsaMinorThrottle::disconnect() {
+void ProductUrsaMinorThrottle::blackout() {
     setLedBrightness(UrsaMinorThrottleLed::BACKLIGHT, 0);
     setLedBrightness(UrsaMinorThrottleLed::OVERALL_LEDS_AND_LCD_BRIGHTNESS, 0);
 
-    PluginsMenu::getInstance()->removeItem(menuItemId);
-
-    if (profile) {
-        delete profile;
-        profile = nullptr;
-    }
-
-    USBDevice::disconnect();
+    setAllLedsEnabled(false);
 }
 
 void ProductUrsaMinorThrottle::update() {
@@ -106,6 +133,26 @@ void ProductUrsaMinorThrottle::update() {
     }
 
     USBDevice::update();
+
+    if (Dataref::getInstance()->getCached<int>("sim/time/total_flight_time_sec") > 10) {
+        float gForce = Dataref::getInstance()->get<float>("sim/flightmodel/forces/g_nrml");
+        float delta = fabs(gForce - lastGForce);
+        lastGForce = gForce;
+
+        bool onGround = Dataref::getInstance()->getCached<bool>("sim/flightmodel/failures/onground_any");
+        uint8_t vibration = (uint8_t) std::min(255.0f, delta * vibrationMultiplier / (onGround ? 1.0f : 2.0f));
+        if (vibration < 6) {
+            vibration = 0;
+        }
+
+        if (lastVibration != vibration) {
+            setVibration(vibration, true, true);
+            lastVibration = vibration;
+        }
+    } else if (lastVibration > 0) {
+        lastVibration = 0;
+        setVibration(lastVibration, true, true);
+    }
 
     if (profile) {
         profile->update();
@@ -294,6 +341,14 @@ void ProductUrsaMinorThrottle::didReceiveData(int reportId, uint8_t *report, int
 
 void ProductUrsaMinorThrottle::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count) {
     USBDevice::didReceiveButton(hardwareButtonIndex, pressed, count);
+
+    if (!connected || !profile) {
+        return;
+    }
+
+    if (isButtonHandledByXPlane(hardwareButtonIndex)) {
+        return;
+    }
 
     auto &buttons = profile->buttonDefs();
     auto it = buttons.find(hardwareButtonIndex);

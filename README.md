@@ -1,19 +1,19 @@
-## Winwing plugin for X-Plane
+## WINCTRL plugin for X-Plane
 
-For X-Plane 11 and X-Plane 12
+For X-Plane 11 and X-Plane 12. Formerly the Winwing plugin for X-Plane.
 
-This plugin allows you to use Winwing devices in X-Plane on MacOS and Linux.
-The plugin theoretically works on Windows, but is not required there, as Winwing provides a native Windows driver through the SimAppPro software.
+This plugin allows you to use WINCTRL devices in X-Plane on MacOS and Linux.
+The plugin theoretically works on Windows, but is not required there, as WINCTRL provides a native Windows driver through the SimAppPro software.
 
 ### Installation
 
 1. Download the latest release from the releases page.
 2. Unzip the downloaded file.
-3. Copy the `Winwing` folder to your X-Plane `Resources/plugins` directory.
+3. Copy the `winctrl` folder to your X-Plane `Resources/plugins` directory.
 4. Start X-Plane.
-5. Updating can be done by replacing the `Winwing` folder or using Skunkcrafts Updater if you have it installed.
+5. Updating can be done by replacing the `winctrl` folder or using Skunkcrafts Updater if you have it installed.
 
-For linux, see the [Linux udev rules](#linux-udev-rules) section below to ensure proper permissions.
+For linux, see the [Linux udev rules](#linux-udev-rules) section below to ensure proper permissions and stable device recognition.
 
 ### Contributing
 
@@ -27,38 +27,30 @@ For linux, see the [Linux udev rules](#linux-udev-rules) section below to ensure
 
 ### Usage
 
-- The plugin will automatically detect your Winwing devices.
+- The plugin will automatically detect your WINCTRL devices.
 - There are no user-configurable settings at this time.
 
 ### Compatibility Matrix
 
 The matrix below shows device and aircraft compatibility. Devices are listed vertically, aircraft horizontally.
-
-| Device                      | Toliss A3xx | Laminar A330 | Laminar 737 | AeroGenesis A330 | Zibo / LevelUp 737 | IXEG 737 | FlightFactor 767/777 | FlightFactor A350 V1 | SSG 747 |
-| --------------------------- | ----------- | ------------ | ----------- | ---------------- | ------------------ | -------- | -------------------- | -------------------- | ------- |
-| **URSA MINOR Joystick L+R** | 🟢          | 🟢           | 🔴          | 🟢               | 🟢                 | 🟢       | 🟢                   | 🔴                   | 🟢      |
-| **URSA MINOR Throttle**     | 🟢          | 🔴           | 🔴          | 🔴               | 🔴                 | 🔴       | 🔴                   | 🔴                   | 🔴      |
-| **MCDU-32**                 | 🟢          | 🟢           | 🔴          | 🟢               | 🟢                 | 🟢       | 🟢                   | 🔴                   | 🟠      |
-| **PFP 3N**                  | 🟢          | 🟢           | 🔴          | 🟢               | 🟢                 | 🟢       | 🟢                   | 🔴                   | 🟠      |
-| **PFP 4**                   | 🟢          | 🟢           | 🔴          | 🟢               | 🟢                 | 🟢       | 🟢                   | 🔴                   | 🟠      |
-| **PFP 7**                   | 🟢          | 🟢           | 🔴          | 🟢               | 🟢                 | 🟢       | 🟢                   | 🔴                   | 🟠      |
-| **PAP3 / PAP3 Mag**         | 🔴          | 🔴           | 🔴          | 🔴               | 🟢                 | 🔴       | 🟢                   | 🔴                   | 🔴      |
-| **FCU and EFIS L+R**        | 🟢          | 🟢           | 🟠          | 🔴               | 🔴                 | 🔴       | 🟢                   | 🟢                   | 🔴      |
-| **ECAM32**                  | 🟢          | 🔴           | 🔴          | 🔴               | 🔴                 | 🔴       | 🔴                   | 🔴                   | 🔴      |
-| **AGP**                     | 🟢          | 🔴           | 🔴          | 🔴               | 🔴                 | 🔴       | 🔴                   | 🔴                   | 🔴      |
-| **3N / 3M PDC**             | 🔴          | 🔴           | 🔴          | 🔴               | 🟢                 | 🔴       | 🟢                   | 🔴                   | 🔴      |
-
-#### Legend
-
-- 🟢 **Fully implemented** - All features working
-- 🟠 **Partly implemented** - Some limitations or missing features
-- 🔴 **Not implemented** - No support
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Device&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ToLiss A3xx | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Zibo / LevelUp 737 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; X-Crafts E-Jets | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; X-Crafts ERJ | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FlightFactor 767 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FlightFactor 777 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FlightFactor A350 V1 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Rotate MD-11 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IXEG 737 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FPS 747-800i V2 (SSG) and V3 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; JustFlight 146 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CIS Seneca II | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Laminar 737 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Laminar A330 (Aerogenesis) | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Laminar Citation X | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Laminar C172 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Sparky 744 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; JarDesign A330 | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Stratosphere Studios 777-300ER | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Airfoillabs King Air 350 |
+|--- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Joystick (URSA MINOR Airline L+R, ORION Joystick Base II)** | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
+| **FMC (MCDU, PFP 3N/4/7)** | &check; | &check; | &check; | &check; | &check; | &check; | &nbsp; | &check; | &check; | &check; | &nbsp; | &nbsp; | &nbsp; | &check; | &check; | &nbsp; | &check; | &check; | &check; | &nbsp; |
+| **3N PAP MCP** | &nbsp; | &check; | &check; | &check; | &nbsp; | &check; | &nbsp; | &check; | &nbsp; | &check; | &nbsp; | &nbsp; | &check; | &nbsp; | &nbsp; | &nbsp; | &check; | &nbsp; | &check; | &nbsp; |
+| **3N / 3M PDC** | &nbsp; | &check; | &check; | &check; | &nbsp; | &check; | &nbsp; | &nbsp; | &nbsp; | &check; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; |
+| **FCU (+ optional EFIS L+R)** | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &nbsp; | &check; | &check; | &check; | &check; | &check; | &nbsp; | &check; | &check; | &check; | &check; | &check; |
+| **32 ECAM** | &check; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; |
+| **32 AGP Metal** | &check; | &check; | &check; | &check; | &nbsp; | &nbsp; | &nbsp; | &check; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; |
+| **32 TCAS** | &check; | &check; | &nbsp; | &check; | &nbsp; | &nbsp; | &nbsp; | &check; | &nbsp; | &check; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &check; | &nbsp; | &nbsp; | &nbsp; |
+| **32 RMP** | &check; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &check; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; |
+| **URSA MINOR 32 Throttle Metal (+ optional 32 PAC Metal)** | &check; | &check; | &check; | &check; | &nbsp; | &check; | &nbsp; | &check; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; | &nbsp; |
+| **ORION Throttle Base II** | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
 
 ### Known Issues
 
-- 🟠 The SSG 747 does not expose any colour datarefs yet. Therefore, the PFP will not show the correct colours.
-- 🟠 The SSG 747 has a dual FMC, but the datarefs seem to overwrite eachother.
-- 🟠 Laminar 737: FCU is fully functional, but EFIS controls have not been tested yet.
+- The SSG 747 does not expose any colour datarefs yet. Therefore, the PFP will not show the correct colours.
+- The SSG 747 has a dual FMC, but the datarefs seem to overwrite eachother.
 
 ### Credits
 
@@ -68,54 +60,64 @@ The matrix below shows device and aircraft compatibility. Devices are listed ver
 - [@claaslange](https://github.com/claaslange) for the FCU-EFIS integration.
 - [@shred86](https://github.com/shred86) for identifying the Ursa Minor Joystick R.
 - [@Belnadifia](https://github.com/Belnadifia) for the complete PAP3 HID protocol and Zibo profile.
-- [@ColinM9991](https://github.com/ColinM9991) for the FF777 profile.
+- [@ColinM9991](https://github.com/ColinM9991) for the FF777 profile and parts of the FMC protocol.
 - [@tukan68](https://github.com/tukan68) for FF767 profile.
 - [@verres1](https://github.com/verres1) for enriching the FF777 profile.
 - [@teropa](https://forums.x-plane.org/profile/1028374-teropa/) for data capture and testing of multiple devices.
 - [@SoarByWire](https://forums.x-plane.org/profile/411164-soarbywire/) for the testing of multiple devices.
-- [@MortyMars](https://github.com/MortyMars) for the FCU/EFIS FF777 and FF767 profile.
+- [@MortyMars](https://github.com/MortyMars) for the FCU/EFIS FF777, FF767, and FFA350 v1 profiles.
+- [@loftwing](https://github.com/loftwing) for the JF146 profile and testing.
+- [@jcorbier](https://github.com/jcorbier) for the RMP 32 hardware support.
 
 ### Linux udev rules
 
-To ensure Winwing panels are accessible without root and have stable device names, create a udev rules file:
+To ensure WINCTRL panels are accessible without root and have stable device names, create a udev rules file:
 
 ```bash
-sudo nano /etc/udev/rules.d/99-winwing.rules
+sudo nano /etc/udev/rules.d/99-winctrl.rules
 ```
 
 ```udev
-KERNEL=="hidraw*", ATTRS{idProduct}=="bc27", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-ursa-minor-l"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bc28", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-ursa-minor-r"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb36", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-mcdu32-cpt"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb3e", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-mcdu32-fo"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb3a", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-mcdu32-obs"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb35", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp3n-cpt"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb39", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp3n-fo"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb3d", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp3n-obs"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb38", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp4-cpt"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb40", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp4-fo"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb3c", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp4-obs"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb37", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp7-cpt"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb3f", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp7-fo"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb3b", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pfp7-obs"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb10", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bc1e", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu-efis-r"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bc1d", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu-efis-l"
-KERNEL=="hidraw*", ATTRS{idProduct}=="ba01", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-fcu-efis-lr"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bf0f", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-pap3"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb70", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-ecam32"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb80", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-agp"
-KERNEL=="hidraw*", ATTRS{idProduct}=="b920", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-throttle-l"
-KERNEL=="hidraw*", ATTRS{idProduct}=="b930", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-throttle-r"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb61", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-3n-pdc-l"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb62", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-3n-pdc-r"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb51", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-3m-pdc-l"
-KERNEL=="hidraw*", ATTRS{idProduct}=="bb52", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winwing-3m-pdc-r"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bc27", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-ursa-minor-airline-l"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bc28", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-ursa-minor-airline-r"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bc2a", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-ursa-minor-fighter-l"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bc29", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-ursa-minor-fighter-r"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bea8", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-orion-joystick-base-2"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb36", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-mcdu32-cpt"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb3e", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-mcdu32-fo"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb3a", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-mcdu32-obs"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb35", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-pfp3n-cpt"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb39", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-pfp3n-fo"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb3d", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-pfp3n-obs"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb38", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-pfp4-cpt"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb40", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-pfp4-fo"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb3c", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-pfp4-obs"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb37", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-pfp7-cpt"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb3f", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-pfp7-fo"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb3b", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-pfp7-obs"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb10", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-fcu"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bc1e", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-fcu-efis-r"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bc1d", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-fcu-efis-l"
+KERNEL=="hidraw*", ATTRS{idProduct}=="ba01", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-fcu-efis-lr"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bf0f", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-pap3"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb70", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-ecam"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb80", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-agp"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb81", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-tcas"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb83", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-rmp-l"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb84", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-rmp-r"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb85", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-rmp-c"
+KERNEL=="hidraw*", ATTRS{idProduct}=="b920", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-throttle-ursa-minor-l"
+KERNEL=="hidraw*", ATTRS{idProduct}=="b930", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-throttle-ursa-minor-r"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bd64", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-throttle-orion-base-2"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb61", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-3n-pdc-l"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb62", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-3n-pdc-r"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb51", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-3m-pdc-l"
+KERNEL=="hidraw*", ATTRS{idProduct}=="bb52", ATTRS{idVendor}=="4098", MODE="0666", SYMLINK+="winctrl-3m-pdc-r"
 ```
 
 ### Demonstration
 
-Also see the [X-Plane.org forum thread](https://forums.x-plane.org/files/file/95987-winwing-plugin-for-x-plane-12-mac-linux-windows/) for more information and discussion.
+Also see the [X-Plane.org forum thread](https://forums.x-plane.org/files/file/95987-winctrl-plugin-for-x-plane-mac-linux-windows/) for more information and discussion.
 
 <img src="https://github.com/user-attachments/assets/75d4e3e0-af9e-488f-bd5e-2d834bea110d" alt="Airbus A20N" width="256" />
 <img src="https://github.com/user-attachments/assets/8f5750e2-f913-479a-9f7a-6e3d6c31382d" alt="Boeing B738" width="256" />

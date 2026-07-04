@@ -5,7 +5,7 @@
 set -e
 
 echo "======================================"
-echo "Winwing Plugin - Multi-Platform Build"
+echo "WINCTRL Plugin - Multi-Platform Build"
 echo "======================================"
 echo ""
 echo "🐋 All builds running inside Docker container"
@@ -47,7 +47,7 @@ cd ../..
 
 # Copy Linux build
 mkdir -p dist/lin_x64
-cp build/linux/lin_x64/winwing.xpl dist/lin_x64/
+cp build/linux/lin_x64/winctrl.xpl dist/lin_x64/
 
 echo "✓ Linux build complete"
 
@@ -69,7 +69,7 @@ cd ../..
 
 # Copy Windows build
 mkdir -p dist/win_x64
-cp build/windows/win_x64/winwing.xpl dist/win_x64/
+cp build/windows/win_x64/winctrl.xpl dist/win_x64/
 
 echo "✓ Windows build complete"
 
@@ -98,7 +98,7 @@ if cmake --build . --config Release -j$(nproc); then
     cd ../..
     # Copy macOS build
     mkdir -p dist/mac_x64
-    cp build/macos/mac_x64/winwing.xpl dist/mac_x64/
+    cp build/macos/mac_x64/winctrl.xpl dist/mac_x64/
     echo "✓ macOS build complete"
 else
     cd ../..
@@ -114,7 +114,7 @@ echo "======================================"
 
 echo ""
 echo "Platform builds:"
-ls -lh dist/*/winwing.xpl 2>/dev/null || true
+ls -lh dist/*/winctrl.xpl 2>/dev/null || true
 
 echo ""
 echo "All platform builds complete!"

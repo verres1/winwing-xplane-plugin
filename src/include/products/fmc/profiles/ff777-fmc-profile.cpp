@@ -2,55 +2,51 @@
 
 #include "appstate.h"
 #include "dataref.h"
-#include "font.h"
 #include "product-fmc.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 FlightFactor777FMCProfile::FlightFactor777FMCProfile(ProductFMC *product) : FMCAircraftProfile(product) {
     product->setAllLedsEnabled(false);
-    product->setFont(Font::GlyphData(FontVariant::Font737, product->identifierByte));
+    product->setFont(FontVariant::Font737);
 
     const std::string cdu = product->deviceVariant == FMCDeviceVariant::VARIANT_CAPTAIN ? "cduL" : (product->deviceVariant == FMCDeviceVariant::VARIANT_FIRSTOFFICER ? "cduR" : "cduC");
     Dataref::getInstance()->monitorExistingDataref<float>(("1-sim/" + cdu + "/brt").c_str(), [product, cdu](float brightness) {
         uint8_t target = Dataref::getInstance()->get<bool>(("1-sim/" + cdu + "/ok").c_str()) ? brightness * 255 : 0;
         product->setLedBrightness(FMCLed::SCREEN_BACKLIGHT, target);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("1-sim/ckpt/lights/aisle", [product, cdu](float brightness) {
         uint8_t target = Dataref::getInstance()->get<bool>(("1-sim/" + cdu + "/ok").c_str()) ? brightness * 255 : 0;
         product->setLedBrightness(FMCLed::BACKLIGHT, target);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>(("1-sim/" + cdu + "/ok").c_str(), [cdu](bool poweredOn) {
         Dataref::getInstance()->executeChangedCallbacksForDataref(("1-sim/" + cdu + "/brt").c_str());
         Dataref::getInstance()->executeChangedCallbacksForDataref("1-sim/ckpt/lights/aisle");
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("1-sim/ckpt/lamps/cduCptAct", [product](bool enabled) {
         product->setLedBrightness(FMCLed::PFP_EXEC, enabled ? 1 : 0);
-        product->setLedBrightness(FMCLed::MCDU_RDY, enabled ? 1 : 0);
-    });
+        product->setLedBrightness(FMCLed::MCDU_STATUS, enabled ? 1 : 0);
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("1-sim/ckpt/lamps/cduCptMSG", [product](bool enabled) {
         product->setLedBrightness(FMCLed::PFP_MSG, enabled ? 1 : 0);
         product->setLedBrightness(FMCLed::MCDU_MCDU, enabled ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("1-sim/ckpt/lamps/cduCptOFST", [product](bool enabled) {
         product->setLedBrightness(FMCLed::PFP_OFST, enabled ? 1 : 0);
-    });
-}
-
-FlightFactor777FMCProfile::~FlightFactor777FMCProfile() {
-    const std::string cdu = product->deviceVariant == FMCDeviceVariant::VARIANT_CAPTAIN ? "cduL" : (product->deviceVariant == FMCDeviceVariant::VARIANT_FIRSTOFFICER ? "cduR" : "cduC");
-    Dataref::getInstance()->unbind(("1-sim/" + cdu + "/brt").c_str());
-    Dataref::getInstance()->unbind("1-sim/ckpt/lights/aisle");
-    Dataref::getInstance()->unbind(("1-sim/" + cdu + "/ok").c_str());
-    Dataref::getInstance()->unbind("1-sim/ckpt/lamps/cduCptAct");
-    Dataref::getInstance()->unbind("1-sim/ckpt/lamps/cduCptMSG");
-    Dataref::getInstance()->unbind("1-sim/ckpt/lamps/cduCptOFST");
+    },
+        this);
 }
 
 bool FlightFactor777FMCProfile::IsEligible() {
@@ -184,7 +180,7 @@ const std::map<char, FMCTextColor> &FlightFactor777FMCProfile::colorMap() const 
         {3, FMCTextColor::COLOR_GREEN},
         {4, FMCTextColor::COLOR_CYAN},
         {5, FMCTextColor::COLOR_GREY},
-        {6, FMCTextColor::COLOR_WHITE_BG},
+        {6, FMCTextColor::withBackgroundColor(FMCTextColor::COLOR_WHITE, FMCTextColor::COLOR_GREY)},
     };
 
     return colMap;
@@ -249,9 +245,35 @@ void FlightFactor777FMCProfile::updatePage(std::vector<std::vector<char>> &page)
 }
 
 void FlightFactor777FMCProfile::buttonPressed(const FMCButtonDef *button, XPLMCommandPhase phase) {
-    if (phase == xplm_CommandContinue) {
+    if (!button || button->dataref.empty() || phase == xplm_CommandContinue) {
         return;
     }
 
-    Dataref::getInstance()->executeCommand(button->dataref.c_str(), phase);
+    auto datarefManager = Dataref::getInstance();
+    if (button->datarefType == FMCDatarefType::SET_VALUE || button->datarefType == FMCDatarefType::SET_VALUE_PHASED) {
+        double value = std::fabs(button->value) < std::numeric_limits<double>::epsilon() ? 1.0 : button->value;
+        if (button->datarefType == FMCDatarefType::SET_VALUE && phase != xplm_CommandBegin) {
+            return;
+        }
+
+        datarefManager->set<double>(button->dataref.c_str(), phase == xplm_CommandBegin ? value : 0.0);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::ADJUST_VALUE) {
+        double currentValue = datarefManager->get<double>(button->dataref.c_str());
+        datarefManager->set<double>(button->dataref.c_str(), currentValue + button->value);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_MULTIPLE_CMD_ONCE) {
+        std::stringstream ss(button->dataref);
+        std::string item;
+        std::vector<std::string> commands;
+        while (std::getline(ss, item, ',')) {
+            commands.push_back(item);
+        }
+
+        for (const auto &cmd : commands) {
+            datarefManager->executeCommand(cmd.c_str());
+        }
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_CMD_ONCE) {
+        datarefManager->executeCommand(button->dataref.c_str());
+    } else {
+        datarefManager->executeCommand(button->dataref.c_str(), phase);
+    }
 }

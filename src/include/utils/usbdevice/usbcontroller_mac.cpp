@@ -1,4 +1,5 @@
 #if APL
+
 #include "appstate.h"
 #include "config.h"
 #include "usbcontroller.h"
@@ -12,12 +13,13 @@ USBController *USBController::instance = nullptr;
 USBController::USBController() {
     hidManager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
     if (CFGetTypeID(hidManager) != IOHIDManagerGetTypeID()) {
+        Logger::getInstance()->error("Failed to create IOHIDManager\n");
         return;
     }
 
     CFMutableDictionaryRef matchingDict = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     if (matchingDict) {
-        uint32_t vid = WINWING_VENDOR_ID;
+        uint32_t vid = WINCTRL_VENDOR_ID;
         CFNumberRef vidNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &vid);
         CFDictionarySetValue(matchingDict, CFSTR(kIOHIDVendorIDKey), vidNum);
         CFRelease(vidNum);
@@ -75,12 +77,18 @@ void USBController::destroy() {
     devices.clear();
 
     if (hidManager) {
+        IOHIDManagerUnscheduleFromRunLoop(hidManager, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
         IOHIDManagerClose(hidManager, kIOHIDOptionsTypeNone);
         CFRelease(hidManager);
         hidManager = nullptr;
     }
 
     instance = nullptr;
+}
+
+void USBController::forgetDevice(USBDevice *device) {
+    // No path/pending tracking outside the devices vector on macOS.
+    (void) device;
 }
 
 bool USBController::deviceExistsWithHIDDevice(IOHIDDeviceRef device) {
@@ -132,15 +140,15 @@ void USBController::DeviceAddedCallback(void *context, IOReturn result, void *se
     productNameStr.erase(0, productNameStr.find_first_not_of(" \t\n\r"));
     productNameStr.erase(productNameStr.find_last_not_of(" \t\n\r") + 1);
 
-    AppState::getInstance()->executeAfter(0, [self, device, vendorId, productId, vendorNameStr, productNameStr]() {
-        if (self->deviceExistsWithHIDDevice(device)) {
-            return;
+    CFRetain(device);
+    AppState::getInstance()->executeAfter(0, self, [self, device, vendorId, productId, vendorNameStr, productNameStr]() {
+        if (!self->deviceExistsWithHIDDevice(device)) {
+            USBDevice *newDevice = USBDevice::Device(device, vendorId, productId, vendorNameStr, productNameStr);
+            if (newDevice) {
+                self->devices.push_back(newDevice);
+            }
         }
-
-        USBDevice *newDevice = USBDevice::Device(device, vendorId, productId, vendorNameStr, productNameStr);
-        if (newDevice) {
-            self->devices.push_back(newDevice);
-        }
+        CFRelease(device);
     });
 }
 
@@ -150,18 +158,23 @@ void USBController::DeviceRemovedCallback(void *context, IOReturn result, void *
     }
 
     auto *self = static_cast<USBController *>(context);
-    for (auto it = self->devices.begin(); it != self->devices.end(); ) {
+    for (auto it = self->devices.begin(); it != self->devices.end(); ++it) {
         if ((*it)->hidDevice == device) {
-            (*it)->disconnect();
-            ++it;
-        } else {
-            ++it;
+            (*it)->connected = false;
+            (*it)->blackout();
         }
     }
 
-    AppState::getInstance()->executeAfter(0, [self, device]() {
+    AppState::getInstance()->executeAfter(0, self, [self, device]() {
         for (auto it = self->devices.begin(); it != self->devices.end();) {
-            if ((*it)->hidDevice == device || !(*it)->profileReady) {
+            if ((*it)->hidDevice == device) {
+                // The OS has already removed the device; mark it so disconnect
+                // skips IOHIDDeviceClose (re-closing triggers an IOKit
+                // assertion) but still releases our retained reference. The
+                // handle stays valid until disconnect has joined the write
+                // thread, so in-flight writes hit a live (if dead) ref.
+                (*it)->deviceRemoved = true;
+                (*it)->disconnect();
                 delete *it;
                 it = self->devices.erase(it);
             } else {

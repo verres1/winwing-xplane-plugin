@@ -15,7 +15,6 @@ class FF767FCUEfisProfile : public FCUEfisAircraftProfile {
 
     public:
         FF767FCUEfisProfile(ProductFCUEfis *product);
-        ~FF767FCUEfisProfile();
 
         static bool IsEligible();
 
@@ -31,7 +30,7 @@ class FF767FCUEfisProfile : public FCUEfisAircraftProfile {
             return true;
         }
 
-        void buttonPressed(const FCUEfisButtonDef *button, XPLMCommandPhase phase) override;        
+        void buttonPressed(const FCUEfisButtonDef *button, XPLMCommandPhase phase) override;
 };
 
 #endif

@@ -2,20 +2,19 @@
 
 #include "config.h"
 #include "dataref.h"
-#include "font.h"
 #include "product-fmc.h"
 
 #include <algorithm>
+#include <cmath>
 
-TolissFMCProfile::TolissFMCProfile(ProductFMC *product) :
-    FMCAircraftProfile(product) {
+TolissFMCProfile::TolissFMCProfile(ProductFMC *product) : FMCAircraftProfile(product) {
     datarefRegex = std::regex("AirbusFBW/MCDU(1|2)([s]{0,1})([a-zA-Z]+)([0-6]{0,1})([L]{0,1})([a-z]{1})");
     isSelfTest = false;
 
     product->setAllLedsEnabled(false);
-    product->setFont(Font::GlyphData(FontVariant::FontAirbus, product->identifierByte));
+    product->setFont(FontVariant::FontAirbus);
 
-    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/MCDUIntegBrightness_Raw", [product](std::vector<float> brightness) {
+    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/MCDUIntegBrightness_Raw", [product](const std::vector<float> &brightness) {
         if (brightness.size() < 2) {
             return;
         }
@@ -23,9 +22,10 @@ TolissFMCProfile::TolissFMCProfile(ProductFMC *product) :
         bool hasPower = Dataref::getInstance()->get<bool>("sim/cockpit/electrical/avionics_on");
         uint8_t backlightBrightness = hasPower ? brightness[product->deviceVariant == FMCDeviceVariant::VARIANT_CAPTAIN ? 0 : 1] * 255 : 0;
         product->setLedBrightness(FMCLed::BACKLIGHT, backlightBrightness);
-    });
+    },
+        this);
 
-    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/DUBrightness", [product](std::vector<float> brightness) {
+    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/DUBrightness", [product](const std::vector<float> &brightness) {
         if (brightness.size() < 8) {
             return;
         }
@@ -33,6 +33,10 @@ TolissFMCProfile::TolissFMCProfile(ProductFMC *product) :
         bool hasPower = Dataref::getInstance()->get<bool>("sim/cockpit/electrical/avionics_on");
 
         std::vector<float> selfTestSecondsRemaining = Dataref::getInstance()->get<std::vector<float>>("AirbusFBW/DUSelfTestTimeLeft");
+        if (selfTestSecondsRemaining.size() < 8) {
+            return;
+        }
+
         float secondsRemaining = selfTestSecondsRemaining[product->deviceVariant == FMCDeviceVariant::VARIANT_CAPTAIN ? 6 : 7];
         if (hasPower && secondsRemaining > 1.0f) {
             // Don't control brightness when a self test is in progress
@@ -41,29 +45,34 @@ TolissFMCProfile::TolissFMCProfile(ProductFMC *product) :
 
         uint8_t screenBrightness = hasPower ? brightness[product->deviceVariant == FMCDeviceVariant::VARIANT_CAPTAIN ? 6 : 7] * 255 : 0;
 
-        bool disableElecConnectorsTest = Dataref::getInstance()->get<std::string>("sim/aircraft/view/acf_ICAO").starts_with("A34");
-        if (!disableElecConnectorsTest) {
-            std::vector<int> elecConnectors = Dataref::getInstance()->get<std::vector<int>>("AirbusFBW/ElecConnectors");
-
-            if (elecConnectors.size() > 11 && elecConnectors[11] != 1) {
-                screenBrightness = 0;
-            }
+        // Read com power to simulate bus switching flicker
+        bool hasComPower = Dataref::getInstance()->get<bool>("sim/cockpit2/radios/actuators/com1_power");
+        if (!hasComPower) {
+            screenBrightness = 0;
         }
 
         product->setLedBrightness(FMCLed::SCREEN_BACKLIGHT, screenBrightness);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("sim/cockpit/electrical/avionics_on", [](bool poweredOn) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/DUBrightness");
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/MCDUIntegBrightness_Raw");
-    });
+    },
+        this);
 
-    Dataref::getInstance()->monitorExistingDataref<std::vector<int>>("AirbusFBW/ElecConnectors", [product](std::vector<int> brightness) {
+    Dataref::getInstance()->monitorExistingDataref<bool>("sim/cockpit2/radios/actuators/com1_power", [product](bool enabled) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/DUBrightness");
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/MCDUIntegBrightness_Raw");
-    });
+    },
+        this);
 
-    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/DUSelfTestTimeLeft", [this, product](std::vector<float> selfTestSecondsRemaining) {
+    Dataref::getInstance()->monitorExistingDataref<int>("AirbusFBW/AnnunMode", [this, product](int annunMode) {
+        product->setAllLedsEnabled(annunMode == 2);
+    },
+        this);
+
+    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/DUSelfTestTimeLeft", [this, product](const std::vector<float> &selfTestSecondsRemaining) {
         if (selfTestSecondsRemaining.size() < 8) {
             return;
         }
@@ -118,29 +127,22 @@ TolissFMCProfile::TolissFMCProfile(ProductFMC *product) :
             product->setLedBrightness(FMCLed::SCREEN_BACKLIGHT, flashSteps[selfTestDisplayHelper][1]);
             selfTestDisplayHelper++;
         }
-    });
+    },
+        this);
 
     Dataref::getInstance()->bindExistingCommand("AirbusFBW/MCDU1KeyClear", [this, product](XPLMCommandPhase phase) {
         if (phase == xplm_CommandBegin && product->deviceVariant == FMCDeviceVariant::VARIANT_CAPTAIN) {
             scratchpadPaddingActive = true;
         }
-    });
+    },
+        this);
 
     Dataref::getInstance()->bindExistingCommand("AirbusFBW/MCDU2KeyClear", [this, product](XPLMCommandPhase phase) {
         if (phase == xplm_CommandBegin && product->deviceVariant == FMCDeviceVariant::VARIANT_FIRSTOFFICER) {
             scratchpadPaddingActive = true;
         }
-    });
-}
-
-TolissFMCProfile::~TolissFMCProfile() {
-    Dataref::getInstance()->unbind("AirbusFBW/MCDUIntegBrightness_Raw");
-    Dataref::getInstance()->unbind("AirbusFBW/DUBrightness");
-    Dataref::getInstance()->unbind("sim/cockpit/electrical/avionics_on");
-    Dataref::getInstance()->unbind("AirbusFBW/ElecConnectors");
-    Dataref::getInstance()->unbind("AirbusFBW/DUSelfTestTimeLeft");
-    Dataref::getInstance()->unbind("AirbusFBW/MCDU1KeyClear");
-    Dataref::getInstance()->unbind("AirbusFBW/MCDU2KeyClear");
+    },
+        this);
 }
 
 bool TolissFMCProfile::IsEligible() {
@@ -310,7 +312,7 @@ const std::vector<FMCButtonDef> &TolissFMCProfile::buttonDefs() const {
                         {std::vector<FMCKey>{FMCKey::MCDU_PERF, FMCKey::PFP3_N1_LIMIT}, "AirbusFBW/" + mcdu + "Perf"},
                         {std::vector<FMCKey>{FMCKey::MCDU_INIT, FMCKey::PFP_INIT_REF}, "AirbusFBW/" + mcdu + "Init"},
                         {FMCKey::MCDU_DATA, "AirbusFBW/" + mcdu + "Data"},
-                        {FMCKey::MCDU_EMPTY_TOP_RIGHT, "AirbusFBW/CaptChronoButton"},
+                        {FMCKey::MCDU_EMPTY_TOP_RIGHT, ""},
                         {FMCKey::BRIGHTNESS_UP, "AirbusFBW/" + mcdu + "KeyBright"},
                         {std::vector<FMCKey>{FMCKey::MCDU_FPLN, FMCKey::PFP_LEGS}, "AirbusFBW/" + mcdu + "Fpln"},
                         {std::vector<FMCKey>{FMCKey::MCDU_RAD_NAV, FMCKey::PFP4_NAV_RAD, FMCKey::PFP7_NAV_RAD}, "AirbusFBW/" + mcdu + "RadNav"},
@@ -320,7 +322,7 @@ const std::vector<FMCButtonDef> &TolissFMCProfile::buttonDefs() const {
                         {FMCKey::MENU, "AirbusFBW/" + mcdu + "Menu"},
                         {FMCKey::BRIGHTNESS_DOWN, "AirbusFBW/" + mcdu + "KeyDim"},
                         {std::vector<FMCKey>{FMCKey::MCDU_AIRPORT, FMCKey::PFP_DEP_ARR}, "AirbusFBW/" + mcdu + "Airport"},
-                        {FMCKey::MCDU_EMPTY_BOTTOM_LEFT, "AirbusFBW/purser/fwd"},
+                        {FMCKey::MCDU_EMPTY_BOTTOM_LEFT, ""},
                         {FMCKey::PAGE_PREV, "AirbusFBW/" + mcdu + "SlewLeft"},
                         {FMCKey::MCDU_PAGE_UP, "AirbusFBW/" + mcdu + "SlewUp"},
                         {FMCKey::PAGE_NEXT, "AirbusFBW/" + mcdu + "SlewRight"},
@@ -582,5 +584,35 @@ void TolissFMCProfile::updatePage(std::vector<std::vector<char>> &page) {
 }
 
 void TolissFMCProfile::buttonPressed(const FMCButtonDef *button, XPLMCommandPhase phase) {
-    Dataref::getInstance()->executeCommand(button->dataref.c_str(), phase);
+    if (!button || button->dataref.empty() || phase == xplm_CommandContinue) {
+        return;
+    }
+
+    auto datarefManager = Dataref::getInstance();
+    if (button->datarefType == FMCDatarefType::SET_VALUE || button->datarefType == FMCDatarefType::SET_VALUE_PHASED) {
+        double value = std::fabs(button->value) < std::numeric_limits<double>::epsilon() ? 1.0 : button->value;
+        if (button->datarefType == FMCDatarefType::SET_VALUE && phase != xplm_CommandBegin) {
+            return;
+        }
+
+        datarefManager->set<double>(button->dataref.c_str(), phase == xplm_CommandBegin ? value : 0.0);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::ADJUST_VALUE) {
+        double currentValue = datarefManager->get<double>(button->dataref.c_str());
+        datarefManager->set<double>(button->dataref.c_str(), currentValue + button->value);
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_MULTIPLE_CMD_ONCE) {
+        std::stringstream ss(button->dataref);
+        std::string item;
+        std::vector<std::string> commands;
+        while (std::getline(ss, item, ',')) {
+            commands.push_back(item);
+        }
+
+        for (const auto &cmd : commands) {
+            datarefManager->executeCommand(cmd.c_str());
+        }
+    } else if (phase == xplm_CommandBegin && button->datarefType == FMCDatarefType::EXECUTE_CMD_ONCE) {
+        datarefManager->executeCommand(button->dataref.c_str());
+    } else {
+        datarefManager->executeCommand(button->dataref.c_str(), phase);
+    }
 }

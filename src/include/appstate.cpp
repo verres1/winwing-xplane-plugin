@@ -2,10 +2,12 @@
 
 #include "config.h"
 #include "dataref.h"
+#include "power-scheme.h"
 #include "SimpleIni.h"
 #include "usbcontroller.h"
 #include "usbdevice.h"
 
+#include <algorithm>
 #include <fstream>
 #include <XPLMProcessing.h>
 
@@ -13,7 +15,6 @@ AppState *AppState::instance = nullptr;
 
 AppState::AppState() {
     pluginInitialized = false;
-    debuggingEnabled = false;
 }
 
 AppState::~AppState() {
@@ -35,8 +36,23 @@ bool AppState::initialize() {
 
     XPLMRegisterFlightLoopCallback(AppState::Update, REFRESH_INTERVAL_SECONDS_FAST, nullptr);
 
+    WindowsPowerScheme::enableHighPerformance();
+
     pluginInitialized = true;
 
+#ifdef DEBUG
+    Dataref::getInstance()->createCommand(
+        PRODUCT_NAME "/debug/disconnect_all_devices", "Disconnects all devices", [this](XPLMCommandPhase inPhase) {
+            if (inPhase != xplm_CommandBegin) {
+                return;
+            }
+
+            Logger::getInstance()->info("Disconnecting all devices via debug command...\n");
+            USBController::getInstance()->disconnectAllDevices();
+        });
+#endif
+
+    Logger::getInstance()->info("Plugin initialized.\n");
     return true;
 }
 
@@ -45,15 +61,30 @@ void AppState::deinitialize() {
         return;
     }
 
+    Logger::getInstance()->info("Plugin deinitializing...\n");
+
+    WindowsPowerScheme::restorePrevious();
+
     XPLMUnregisterFlightLoopCallback(AppState::Update, nullptr);
 
-    USBController::getInstance()->destroy();
+    // destroy() resets the singleton pointer but does not free the object;
+    // delete it here or it leaks once per enable/disable cycle. Safe because
+    // the destructor's own destroy() call is idempotent and the task queue is
+    // cleared below before any queued lambda capturing the controller can run.
+    USBController *usbController = USBController::getInstance();
+    usbController->destroy();
+    delete usbController;
 
     Dataref::getInstance()->destroyAllBindings();
 
     pluginInitialized = false;
+
+    {
+        std::lock_guard<std::mutex> lock(taskQueueMutex);
+        taskQueue.clear();
+    }
+
     instance = nullptr;
-    taskQueue.clear();
 }
 
 float AppState::Update(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon) {
@@ -70,16 +101,43 @@ float AppState::Update(float inElapsedSinceLastCall, float inElapsedTimeSinceLas
 
 void AppState::update() {
     auto now = std::chrono::steady_clock::now();
-    for (auto &task : taskQueue) {
-        if (now >= task.runAt && task.func) {
-            task.func();
+
+    // Collect ready tasks under the lock, leaving non-ready tasks in the queue.
+    // Executing outside the lock lets callbacks safely call executeAfter without
+    // risk of reallocation invalidating the functor currently on the call stack.
+    std::vector<DelayedTask> readyTasks;
+    {
+        std::lock_guard<std::mutex> lock(taskQueueMutex);
+        cancelledOwners.clear();
+        std::vector<DelayedTask> remaining;
+        remaining.reserve(taskQueue.size());
+        for (auto &task : taskQueue) {
+            if (now >= task.runAt) {
+                readyTasks.push_back(std::move(task));
+            } else {
+                remaining.push_back(std::move(task));
+            }
         }
+        taskQueue = std::move(remaining);
     }
 
-    taskQueue.erase(std::remove_if(taskQueue.begin(), taskQueue.end(), [&](auto &task) {
-        return now >= task.runAt;
-    }),
-        taskQueue.end());
+    for (auto &task : readyTasks) {
+        if (!task.func) {
+            continue;
+        }
+
+        // An earlier task in this batch may have destroyed this task's owner
+        // (e.g. a deferred device deletion); cancelTasksForOwner records the
+        // owner so tasks already extracted into the batch are skipped too.
+        if (task.owner) {
+            std::lock_guard<std::mutex> lock(taskQueueMutex);
+            if (std::find(cancelledOwners.begin(), cancelledOwners.end(), task.owner) != cancelledOwners.end()) {
+                continue;
+            }
+        }
+
+        task.func();
+    }
 
     if (!pluginInitialized) {
         return;
@@ -92,24 +150,40 @@ void AppState::update() {
     }
 }
 
-void AppState::executeAfter(int milliseconds, std::function<void()> func) {
-    taskQueue.push_back({"",
-        std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds),
-        func});
+void AppState::executeAfter(int milliseconds, void *owner, std::function<void()> func) {
+    std::lock_guard<std::mutex> lock(taskQueueMutex);
+    taskQueue.push_back({"", owner, std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds), func});
 }
 
-void AppState::executeAfterDebounced(std::string taskName, int milliseconds, std::function<void()> func) {
+void AppState::executeAfterDebounced(std::string taskName, int milliseconds, void *owner, std::function<void()> func) {
     auto now = std::chrono::steady_clock::now();
+    std::lock_guard<std::mutex> lock(taskQueueMutex);
     auto it = std::find_if(taskQueue.begin(), taskQueue.end(), [&](const DelayedTask &t) {
-        return t.name == taskName;
+        return t.owner == owner && t.name == taskName;
     });
 
     if (it != taskQueue.end()) {
         it->runAt = now + std::chrono::milliseconds(milliseconds);
+        it->owner = owner;
         it->func = func;
     } else {
-        taskQueue.push_back({taskName, now + std::chrono::milliseconds(milliseconds), func});
+        taskQueue.push_back({taskName, owner, now + std::chrono::milliseconds(milliseconds), func});
     }
+}
+
+void AppState::cancelTasksForOwner(void *owner) {
+    if (!owner) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(taskQueueMutex);
+    taskQueue.erase(
+        std::remove_if(taskQueue.begin(), taskQueue.end(),
+            [owner](const DelayedTask &t) {
+                return t.owner == owner;
+            }),
+        taskQueue.end());
+    cancelledOwners.push_back(owner);
 }
 
 std::string AppState::readPreference(const std::string &key, const std::string &defaultValue) {
@@ -136,7 +210,7 @@ void AppState::writePreference(const std::string &key, const std::string &value)
 
     rc = ini.SaveFile((getPluginDirectory() + "/preferences.ini").c_str());
     if (rc < 0) {
-        debug_force("Failed to save preferences file.\n");
+        Logger::getInstance()->info("Failed to save preferences file.\n");
     }
 }
 

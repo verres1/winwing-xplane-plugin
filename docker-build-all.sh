@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to build Winwing plugin for all platforms using Docker
+# Script to build WINCTRL plugin for all platforms using Docker
 
 set -e
 
@@ -8,7 +8,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
 echo "======================================"
-echo "Building Winwing Plugin"
+echo "Building WINCTRL Plugin"
 echo "Multi-Platform Docker Build"
 echo "======================================"
 echo ""
@@ -30,7 +30,7 @@ fi
 # Build Docker image
 echo ""
 echo "Building Docker image..."
-docker build -t winwing-builder .
+docker build -t winctrl-builder .
 
 echo ""
 echo "Running multi-platform build..."
@@ -39,7 +39,7 @@ docker run --rm \
     -v "$XPLANE_SDK_DIR:/xplane-sdk:ro" \
     -e XPLANE_SDK_DIR=/xplane-sdk \
     -e MACOS_OPENGL_HEADERS_DIR="$MACOS_OPENGL_HEADERS_DIR" \
-    winwing-builder
+    winctrl-builder
 
 echo ""
 echo "======================================"
@@ -66,7 +66,7 @@ else
 fi
 
 # Create proper X-Plane plugin structure
-PACKAGE_DIR="dist/winwing"
+PACKAGE_DIR="dist/winctrl"
 rm -rf "$PACKAGE_DIR" 2>/dev/null || true
 mkdir -p "$PACKAGE_DIR"
 
@@ -85,13 +85,13 @@ cp README.md "$PACKAGE_DIR/" 2>/dev/null || echo "No README found"
 
 # Create zip package
 cd dist
-ZIP_NAME="winwing-${VERSION}-${XPLANE_VERSION}.zip"
+ZIP_NAME="winctrl-${VERSION}-${XPLANE_VERSION}.zip"
 if command -v zip &> /dev/null; then
-    zip -r "$ZIP_NAME" winwing/
+    zip -r "$ZIP_NAME" winctrl/
     echo "Created: $ZIP_NAME"
 else
-    ZIP_NAME="winwing-${VERSION}-${XPLANE_VERSION}.tar.gz"
-    tar -czf "$ZIP_NAME" winwing/
+    ZIP_NAME="winctrl-${VERSION}-${XPLANE_VERSION}.tar.gz"
+    tar -czf "$ZIP_NAME" winctrl/
     echo "Created: $ZIP_NAME (zip not available, used tar.gz)"
 fi
 cd ..
@@ -102,11 +102,11 @@ echo "Build Complete!"
 echo "======================================"
 echo ""
 echo "✅ Plugin binaries:"
-ls -lh dist/winwing/*/winwing.xpl 2>/dev/null || echo "No builds found"
+ls -lh dist/winctrl/*/winctrl.xpl 2>/dev/null || echo "No builds found"
 
 echo ""
 echo "📦 Installation package created:"
-ls -lh dist/winwing-${VERSION}-${XPLANE_VERSION}.* 2>/dev/null
+ls -lh dist/winctrl-${VERSION}-${XPLANE_VERSION}.* 2>/dev/null
 
 echo ""
 echo "======================================"
@@ -115,17 +115,17 @@ echo "======================================"
 echo ""
 echo "Quick Install:"
 echo "  1. Extract the package file:"
-if [ -f "dist/winwing-${VERSION}-${XPLANE_VERSION}.zip" ]; then
-    echo "     unzip dist/winwing-${VERSION}-${XPLANE_VERSION}.zip"
+if [ -f "dist/winctrl-${VERSION}-${XPLANE_VERSION}.zip" ]; then
+    echo "     unzip dist/winctrl-${VERSION}-${XPLANE_VERSION}.zip"
 else
-    echo "     tar -xzf dist/winwing-${VERSION}-${XPLANE_VERSION}.tar.gz"
+    echo "     tar -xzf dist/winctrl-${VERSION}-${XPLANE_VERSION}.tar.gz"
 fi
-echo "  2. Copy the extracted 'winwing' folder to:"
+echo "  2. Copy the extracted 'winctrl' folder to:"
 echo "     X-Plane 12/Resources/plugins/"
 echo ""
 echo "Manual Install:"
-echo "  Linux:   cp dist/winwing/lin_x64/winwing.xpl 'X-Plane 12/Resources/plugins/winwing/lin_x64/'"
-echo "  Windows: cp dist/winwing/win_x64/winwing.xpl 'X-Plane 12/Resources/plugins/winwing/win_x64/'"
-echo "  macOS:   cp dist/winwing/mac_x64/winwing.xpl 'X-Plane 12/Resources/plugins/winwing/mac_x64/'"
+echo "  Linux:   cp dist/winctrl/lin_x64/winctrl.xpl 'X-Plane 12/Resources/plugins/winctrl/lin_x64/'"
+echo "  Windows: cp dist/winctrl/win_x64/winctrl.xpl 'X-Plane 12/Resources/plugins/winctrl/win_x64/'"
+echo "  macOS:   cp dist/winctrl/mac_x64/winctrl.xpl 'X-Plane 12/Resources/plugins/winctrl/mac_x64/'"
 echo ""
 

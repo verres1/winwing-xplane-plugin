@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for Winwing X-Plane plugin
+# Build script for WINCTRL X-Plane plugin
 
 set -e
 
@@ -96,7 +96,7 @@ echo "Plugin output location: $BUILD_DIR/"
 echo ""
 
 if [[ "$PLATFORM" == "linux" ]]; then
-    PLUGIN_PATH="lin_x64/winwing.xpl"
+    PLUGIN_PATH="lin_x64/winctrl.xpl"
     echo "Linux plugin: $PLUGIN_PATH"
     if [ -f "$PLUGIN_PATH" ]; then
         SIZE_BEFORE=$(stat -c%s "$PLUGIN_PATH" 2>/dev/null || stat -f%z "$PLUGIN_PATH" 2>/dev/null)
@@ -114,7 +114,7 @@ if [[ "$PLATFORM" == "linux" ]]; then
         fi
     fi
 elif [[ "$PLATFORM" == "mac" ]]; then
-    PLUGIN_PATH="mac_x64/winwing.xpl"
+    PLUGIN_PATH="mac_x64/winctrl.xpl"
     echo "Mac plugin: $PLUGIN_PATH"
     if [ -f "$PLUGIN_PATH" ]; then
         SIZE_BEFORE=$(stat -f%z "$PLUGIN_PATH" 2>/dev/null || stat -c%s "$PLUGIN_PATH" 2>/dev/null)
@@ -132,7 +132,7 @@ elif [[ "$PLATFORM" == "mac" ]]; then
         fi
     fi
 elif [[ "$PLATFORM" == "windows" ]]; then
-    PLUGIN_PATH="win_x64/winwing.xpl"
+    PLUGIN_PATH="win_x64/winctrl.xpl"
     echo "Windows plugin: $PLUGIN_PATH"
     if [ -f "$PLUGIN_PATH" ]; then
         SIZE_BEFORE=$(stat -c%s "$PLUGIN_PATH" 2>/dev/null || stat -f%z "$PLUGIN_PATH" 2>/dev/null)

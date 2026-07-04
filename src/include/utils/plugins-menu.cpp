@@ -8,7 +8,7 @@
 
 PluginsMenu *PluginsMenu::instance = nullptr;
 
-PluginsMenu::PluginsMenu() : mainMenuId(nullptr), nextItemId(0) {
+PluginsMenu::PluginsMenu() : mainMenuId(nullptr), mainMenuItemIndex(-1), nextItemId(0) {
 }
 
 PluginsMenu::~PluginsMenu() {
@@ -25,8 +25,8 @@ PluginsMenu *PluginsMenu::getInstance() {
 
 void PluginsMenu::ensureMenuExists() {
     if (mainMenuId == nullptr) {
-        int item = XPLMAppendMenuItem(XPLMFindPluginsMenu(), FRIENDLY_NAME, nullptr, 1);
-        mainMenuId = XPLMCreateMenu(FRIENDLY_NAME, XPLMFindPluginsMenu(), item, handleMenuAction, this);
+        mainMenuItemIndex = XPLMAppendMenuItem(XPLMFindPluginsMenu(), FRIENDLY_NAME, nullptr, 1);
+        mainMenuId = XPLMCreateMenu(FRIENDLY_NAME, XPLMFindPluginsMenu(), mainMenuItemIndex, handleMenuAction, this);
     }
 }
 
@@ -41,7 +41,19 @@ void PluginsMenu::addMenuItemsToMenu(XPLMMenuID parentMenu, const std::vector<Me
     }
 
     for (const auto &item : items) {
-        if (std::holds_alternative<std::function<void(int)>>(item.content)) {
+        // Check if this is a separator
+        if (item.name == "---") {
+            int subItemId = nextItemId++;
+            XPLMAppendMenuSeparator(parentMenu);
+            itemNames[subItemId] = item.name;
+            persistentItems[subItemId] = persistent;
+            itemToMenuId[subItemId] = parentMenu;
+
+            // Track this as a child of the parent submenu
+            if (parentSubmenuId != -1) {
+                submenuChildren[parentSubmenuId].push_back(subItemId);
+            }
+        } else if (std::holds_alternative<std::function<void(int)>>(item.content)) {
             // Regular menu item with callback
             const auto &callback = std::get<std::function<void(int)>>(item.content);
             int subItemId = nextItemId++;
@@ -63,7 +75,8 @@ void PluginsMenu::addMenuItemsToMenu(XPLMMenuID parentMenu, const std::vector<Me
             // Nested submenu
             const auto &nestedItems = std::get<std::vector<MenuItem>>(item.content);
             int subItemId = nextItemId++;
-            int subItemIndex = XPLMAppendMenuItem(parentMenu, item.name.c_str(), nullptr, 0);
+            // Use -1 as sentinel to prevent accidental callback execution
+            int subItemIndex = XPLMAppendMenuItem(parentMenu, item.name.c_str(), (void *) (intptr_t) -1, 0);
 
             // Create nested submenu
             XPLMMenuID nestedSubmenuId = XPLMCreateMenu(item.name.c_str(), parentMenu, subItemIndex, handleMenuAction, this);
@@ -83,84 +96,145 @@ void PluginsMenu::addMenuItemsToMenu(XPLMMenuID parentMenu, const std::vector<Me
     }
 }
 
-int PluginsMenu::addItemInternal(const std::string &name, const MenuItemContent &content, bool persistent, bool checked) {
+int PluginsMenu::addItemInternal(const std::string &name, const MenuItemContent &content, bool persistent, bool checked, int submenuId) {
     ensureMenuExists();
 
     int itemId = nextItemId++;
+    XPLMMenuID targetMenu = mainMenuId;
+
+    // If submenuId is provided, find the corresponding submenu
+    if (submenuId >= 0) {
+        auto it = submenus.find(submenuId);
+        if (it != submenus.end()) {
+            targetMenu = it->second.first;
+        }
+    }
 
     if (std::holds_alternative<std::function<void(int)>>(content)) {
         // Regular menu item
         const auto &callback = std::get<std::function<void(int)>>(content);
-        int itemIndex = XPLMAppendMenuItem(mainMenuId, name.c_str(), (void *) (intptr_t) itemId, 0);
+        int itemIndex = XPLMAppendMenuItem(targetMenu, name.c_str(), (void *) (intptr_t) itemId, 0);
         menuCallbacks[itemId] = std::make_pair(itemIndex, callback);
         itemNames[itemId] = name;
         persistentItems[itemId] = persistent;
+        itemToMenuId[itemId] = targetMenu;
 
-        if (checked) {
-            XPLMCheckMenuItem(mainMenuId, itemIndex, xplm_Menu_Checked);
+        // Track this as a child of the parent submenu
+        if (submenuId >= 0) {
+            submenuChildren[submenuId].push_back(itemId);
         }
 
-        return itemIndex;
+        if (checked) {
+            XPLMCheckMenuItem(targetMenu, itemIndex, xplm_Menu_Checked);
+        }
+
+        return itemId;
     } else {
         // Submenu
         const auto &items = std::get<std::vector<MenuItem>>(content);
-        int itemIndex = XPLMAppendMenuItem(mainMenuId, name.c_str(), nullptr, 0);
+        // Use -1 as sentinel to prevent accidental callback execution
+        int itemIndex = XPLMAppendMenuItem(targetMenu, name.c_str(), (void *) (intptr_t) -1, 0);
 
         // Create the submenu
-        XPLMMenuID submenuId = XPLMCreateMenu(name.c_str(), mainMenuId, itemIndex, handleMenuAction, this);
-        submenus[itemId] = std::make_pair(submenuId, items);
+        XPLMMenuID newSubmenuId = XPLMCreateMenu(name.c_str(), targetMenu, itemIndex, handleMenuAction, this);
+        submenus[itemId] = std::make_pair(newSubmenuId, items);
 
         itemNames[itemId] = name;
         persistentItems[itemId] = persistent;
+        itemToMenuId[itemId] = targetMenu;
+        // Store a placeholder in menuCallbacks so we can find the itemIndex
+        menuCallbacks[itemId] = std::make_pair(itemIndex, [](int) {});
+
+        // Track this as a child of the parent submenu
+        if (submenuId >= 0) {
+            submenuChildren[submenuId].push_back(itemId);
+        }
 
         // Add items to the submenu (handles nested submenus recursively)
-        addMenuItemsToMenu(submenuId, items, persistent);
+        addMenuItemsToMenu(newSubmenuId, items, persistent);
 
-        return itemIndex;
+        return itemId;
     }
 }
 
-int PluginsMenu::addItem(const std::string &name, const MenuItemContent &content, bool checked) {
-    return addItemInternal(name, content, false, checked);
+int PluginsMenu::addItem(const std::string &name, const MenuItemContent &content, bool checked, int submenuId) {
+    return addItemInternal(name, content, false, checked, submenuId);
 }
 
-int PluginsMenu::addPersistentItem(const std::string &name, const MenuItemContent &content, bool checked) {
-    return addItemInternal(name, content, true, checked);
+int PluginsMenu::addPersistentItem(const std::string &name, const MenuItemContent &content, bool checked, int submenuId) {
+    return addItemInternal(name, content, true, checked, submenuId);
 }
 
-void PluginsMenu::removeItem(int itemIndex) {
+void PluginsMenu::removeItem(int itemId) {
     if (mainMenuId == nullptr) {
         return;
     }
 
-    // Find the itemId for this itemIndex
-    int itemIdToRemove = -1;
-    for (const auto &entry : menuCallbacks) {
-        int itemId = entry.first;
-        int storedIndex = entry.second.first;
-        if (storedIndex == itemIndex) {
-            itemIdToRemove = itemId;
-            break;
-        }
+    // Find the itemIndex and menu for this itemId
+    int itemIndexToRemove = -1;
+    XPLMMenuID menuToRemoveFrom = nullptr;
+    auto callbackIt = menuCallbacks.find(itemId);
+    if (callbackIt != menuCallbacks.end()) {
+        itemIndexToRemove = callbackIt->second.first;
     }
 
-    if (itemIdToRemove >= 0) {
-        auto submenuIt = submenus.find(itemIdToRemove);
+    auto menuIdIt = itemToMenuId.find(itemId);
+    if (menuIdIt != itemToMenuId.end()) {
+        menuToRemoveFrom = menuIdIt->second;
+    }
+
+    if (itemIndexToRemove >= 0 && menuToRemoveFrom != nullptr) {
+        // If this is a submenu, destroy it and all its children
+        auto submenuIt = submenus.find(itemId);
         if (submenuIt != submenus.end()) {
             XPLMDestroyMenu(submenuIt->second.first);
+
+            // Recursively clean up children
+            auto childrenIt = submenuChildren.find(itemId);
+            if (childrenIt != submenuChildren.end()) {
+                for (int childId : childrenIt->second) {
+                    menuCallbacks.erase(childId);
+                    itemNames.erase(childId);
+                    persistentItems.erase(childId);
+                    itemToMenuId.erase(childId);
+                    submenus.erase(childId);
+                    submenuChildren.erase(childId);
+                }
+                submenuChildren.erase(childrenIt);
+            }
+
             submenus.erase(submenuIt);
         }
 
-        XPLMRemoveMenuItem(mainMenuId, itemIndex);
-        menuCallbacks.erase(itemIdToRemove);
-        itemNames.erase(itemIdToRemove);
-        persistentItems.erase(itemIdToRemove);
+        // Remove from the menu it belongs to
+        XPLMRemoveMenuItem(menuToRemoveFrom, itemIndexToRemove);
+        menuCallbacks.erase(itemId);
+        itemNames.erase(itemId);
+        persistentItems.erase(itemId);
+        itemToMenuId.erase(itemId);
 
-        // Update stored indices for items after the removed one
+        // Update stored indices for items in the same menu after the removed one
         for (auto &entry : menuCallbacks) {
-            int &storedIndex = entry.second.first;
-            if (storedIndex > itemIndex) {
-                storedIndex--;
+            XPLMMenuID entryMenu = mainMenuId;
+            auto entryMenuIt = itemToMenuId.find(entry.first);
+            if (entryMenuIt != itemToMenuId.end()) {
+                entryMenu = entryMenuIt->second;
+            }
+
+            if (entryMenu == menuToRemoveFrom) {
+                int &storedIndex = entry.second.first;
+                if (storedIndex > itemIndexToRemove) {
+                    storedIndex--;
+                }
+            }
+        }
+
+        // Remove from submenu children tracking
+        for (auto &entry : submenuChildren) {
+            auto &children = entry.second;
+            auto childIt = std::find(children.begin(), children.end(), itemId);
+            if (childIt != children.end()) {
+                children.erase(childIt);
             }
         }
     }
@@ -290,13 +364,47 @@ void PluginsMenu::clearAllItems() {
     }
 }
 
+void PluginsMenu::teardown() {
+    if (mainMenuId != nullptr) {
+        XPLMDestroyMenu(mainMenuId);
+        if (mainMenuItemIndex >= 0) {
+            XPLMRemoveMenuItem(XPLMFindPluginsMenu(), mainMenuItemIndex);
+            mainMenuItemIndex = -1;
+        }
+        mainMenuId = nullptr;
+    }
+
+    menuCallbacks.clear();
+    itemNames.clear();
+    persistentItems.clear();
+    submenus.clear();
+    itemToMenuId.clear();
+    submenuChildren.clear();
+    nextItemId = 0;
+}
+
 void PluginsMenu::handleMenuAction(void *mRef, void *iRef) {
+    if (mRef == nullptr) {
+        return;
+    }
+
     auto *self = static_cast<PluginsMenu *>(mRef);
     int itemId = (int) (intptr_t) iRef;
 
-    auto it = self->menuCallbacks.find(itemId);
-    if (it != self->menuCallbacks.end()) {
-        auto &callback = it->second.second;
-        callback(itemId); // Pass itemId instead of itemIndex
+    if (itemId < 0) {
+        return;
+    }
+
+    try {
+        auto it = self->menuCallbacks.find(itemId);
+        if (it != self->menuCallbacks.end() && it->second.second) {
+            // Invoke a copy: the callback may call removeItem/clearAllItems
+            // (e.g. "Reload devices"), which erases the map entry and would
+            // destroy the std::function currently executing.
+            auto callback = it->second.second;
+            callback(itemId);
+        }
+    } catch (...) {
+        // Swallow all exceptions to prevent crashes from menu callbacks
     }
 }

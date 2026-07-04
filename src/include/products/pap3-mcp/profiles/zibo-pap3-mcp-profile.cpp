@@ -22,20 +22,22 @@ ZiboPAP3MCPProfile::ZiboPAP3MCPProfile(ProductPAP3MCP *product) : PAP3MCPAircraf
         uint8_t brightness = hasPower ? ratio * 255 : 0;
         product->setLedBrightness(PAP3MCPLed::BACKLIGHT, brightness);
 
-        uint8_t ledBrightness = hasPower && hasMainBus ? 128 : 0;
+        uint8_t ledBrightness = hasPower && hasMainBus ? 180 : 0;
         if (isDisplayTestMode()) {
             ledBrightness = 255;
         }
         product->setLedBrightness(PAP3MCPLed::OVERALL_LED_BRIGHTNESS, ledBrightness);
 
         product->forceStateSync();
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("sim/cockpit/electrical/avionics_on", [product](bool hasPower) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("laminar/B738/electric/panel_brightness");
 
-        product->setLedBrightness(PAP3MCPLed::LCD_BACKLIGHT, hasPower ? 128 : 0);
-    });
+        product->setLedBrightness(PAP3MCPLed::LCD_BACKLIGHT, hasPower ? 180 : 0);
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("laminar/B738/dspl_light_test", [this](std::vector<float> displayTest) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("laminar/B738/electric/panel_brightness");
@@ -57,114 +59,107 @@ ZiboPAP3MCPProfile::ZiboPAP3MCPProfile(ProductPAP3MCP *product) : PAP3MCPAircraf
         Dataref::getInstance()->executeChangedCallbacksForDataref("laminar/B738/autopilot/autothrottle_status1");
         Dataref::getInstance()->executeChangedCallbacksForDataref("laminar/B738/autopilot/master_capt_status");
         Dataref::getInstance()->executeChangedCallbacksForDataref("laminar/B738/autopilot/master_fo_status");
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("laminar/B738/electric/main_bus", [product](bool hasPower) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("sim/cockpit/electrical/avionics_on");
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/n1_status1", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::N1, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/speed_status1", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::SPEED, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/vnav_status1", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::VNAV, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/lvl_chg_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::LVL_CHG, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/hdg_sel_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::HDG_SEL, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/lnav_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::LNAV, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/vorloc_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::VORLOC, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/app_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::APP, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/alt_hld_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::ALT_HLD, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/vs_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::VS, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/cmd_a_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::CMD_A, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/cws_a_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::CWS_A, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/cmd_b_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::CMD_B, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/cws_b_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::CWS_B, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/autothrottle_status1", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::AT_ARM, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/master_capt_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::MA_CAPT, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<float>("laminar/B738/autopilot/master_fo_status", [this, product](float status) {
         product->setLedBrightness(PAP3MCPLed::MA_FO, status > 0.5f || isDisplayTestMode() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("laminar/B738/autopilot/autothrottle_arm_pos", [product](bool armed) {
         product->setATSolenoid(armed);
-    });
-}
-
-ZiboPAP3MCPProfile::~ZiboPAP3MCPProfile() {
-    Dataref::getInstance()->unbind("laminar/B738/electric/instrument_brightness");
-    Dataref::getInstance()->unbind("laminar/B738/electric/panel_brightness");
-    Dataref::getInstance()->unbind("laminar/B738/electric/main_bus");
-    Dataref::getInstance()->unbind("sim/cockpit/electrical/avionics_on");
-    Dataref::getInstance()->unbind("laminar/B738/dspl_light_test");
-
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/n1_status1");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/speed_status1");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/vnav_status1");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/lvl_chg_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/hdg_sel_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/lnav_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/vorloc_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/app_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/alt_hld_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/vs_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/cmd_a_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/cws_a_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/cmd_b_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/cws_b_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/autothrottle_status1");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/autothrottle_arm_pos");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/master_capt_status");
-    Dataref::getInstance()->unbind("laminar/B738/autopilot/master_fo_status");
+    },
+        this);
 }
 
 bool ZiboPAP3MCPProfile::IsEligible() {
-    return Dataref::getInstance()->exists("laminar/B738/autopilot/mcp_speed_dial_kts_mach");
+    return Dataref::getInstance()->exists("zibomod/Aircraft_Path");
 }
 
 const std::vector<std::string> &ZiboPAP3MCPProfile::displayDatarefs() const {
@@ -210,7 +205,33 @@ const std::unordered_map<uint16_t, PAP3MCPButtonDef> &ZiboPAP3MCPProfile::button
         {15, {"SPD INTV", "laminar/B738/autopilot/spd_interv"}},
 
         // Row 3 (byte 0x03)
-        {16, {"ALT INTV", "laminar/B738/autopilot/alt_interv"}}};
+        {16, {"ALT INTV", "laminar/B738/autopilot/alt_interv"}},
+
+        // Encoder rotations (exposed as button pairs by the hardware)
+        {17, {"CRS CAPT DEC", "laminar/B738/autopilot/course_pilot_dn"}},
+        {18, {"CRS CAPT INC", "laminar/B738/autopilot/course_pilot_up"}},
+        {19, {"SPD DEC", "sim/autopilot/airspeed_down"}},
+        {20, {"SPD INC", "sim/autopilot/airspeed_up"}},
+        {21, {"HDG DEC", "laminar/B738/autopilot/heading_dn"}},
+        {22, {"HDG INC", "laminar/B738/autopilot/heading_up"}},
+        {23, {"ALT DEC", "laminar/B738/autopilot/altitude_dn"}},
+        {24, {"ALT INC", "laminar/B738/autopilot/altitude_up"}},
+        {25, {"CRS FO DEC", "laminar/B738/autopilot/course_copilot_dn"}},
+        {26, {"CRS FO INC", "laminar/B738/autopilot/course_copilot_up"}},
+        // 27: FD CAPT       - Handled by handleSwitchChanged (byte 0x04, bit 0x08)
+        // 29: FD FO         - Handled by handleSwitchChanged (byte 0x04, bit 0x20)
+        // 31: AP DISC DOWN  - Handled by handleSwitchChanged (byte 0x04, bit 0x80)
+        // 32: AP DISC UP    - Handled by handleSwitchChanged (byte 0x05, bit 0x01)
+        // 33: Bank angle 10° - Handled by handleBankAngleSwitch (byte 0x05, bit 0x02)
+        // 34: Bank angle 15° - Handled by handleBankAngleSwitch (byte 0x05, bit 0x04)
+        // 35: Bank angle 20° - Handled by handleBankAngleSwitch (byte 0x05, bit 0x08)
+        // 36: Bank angle 25° - Handled by handleBankAngleSwitch (byte 0x05, bit 0x10)
+        // 37: Bank angle 30° - Handled by handleBankAngleSwitch (byte 0x05, bit 0x20)
+        {38, {"VS DEC", "sim/autopilot/vertical_speed_down"}},
+        {39, {"VS INC", "sim/autopilot/vertical_speed_up"}}
+        // 40: A/T ARMED     - Handled by handleSwitchChanged (byte 0x06, bit 0x01)
+        // 41: A/T DISARMED  - Handled by handleSwitchChanged (byte 0x06, bit 0x02)
+    };
     return buttons;
 }
 
@@ -287,28 +308,16 @@ void ZiboPAP3MCPProfile::setBankAngleIndex(int target) {
     }
 
     int current = readBankAngleIndex();
-    if (current < 0) {
+    if (current < 0 || current == target) {
         return;
     }
 
-    // Nudge to target position (max 10 steps to prevent infinite loops)
-    const int maxSteps = 10;
-    int steps = 0;
-
-    while (current != target && steps++ < maxSteps) {
-        const bool goUp = (target > current);
-        const char *cmd = goUp ? "laminar/B738/autopilot/bank_angle_up" : "laminar/B738/autopilot/bank_angle_dn";
-
+    // X-Plane processes commands at end-of-frame, so the dataref won't update
+    // within the same call. Calculate delta up front and fire all commands at once.
+    const char *cmd = (target > current) ? "laminar/B738/autopilot/bank_angle_up" : "laminar/B738/autopilot/bank_angle_dn";
+    int steps = std::abs(target - current);
+    for (int i = 0; i < steps; i++) {
         Dataref::getInstance()->executeCommand(cmd);
-
-        // Re-read position (Zibo updates quickly)
-        int next = readBankAngleIndex();
-        if (next == current) {
-            // Stuck, try again
-            Dataref::getInstance()->executeCommand(cmd);
-            next = readBankAngleIndex();
-        }
-        current = next;
     }
 }
 
@@ -353,14 +362,14 @@ void ZiboPAP3MCPProfile::maybeToggle(const char *dataref, bool hwState, const ch
 
 // Handle maintained switches (FD CAPT/FO, A/T, AP Disconnect)
 void ZiboPAP3MCPProfile::handleSwitchChanged(uint8_t byteOffset, uint8_t bitMask, bool state) {
-    // FD CAPT: byte 0x04, bit 0x08 (inverted - pressed = OFF line, so pressed means switch is ON)
+    // FD CAPT: byte 0x04, bit 0x08; bit is HIGH when switch is ON
     if (byteOffset == 0x04 && bitMask == 0x08) {
-        hwFDCaptOn = state; // State represents if the switch is ON
+        hwFDCaptOn = state;
         maybeToggle("laminar/B738/autopilot/flight_director_pos", hwFDCaptOn, "laminar/B738/autopilot/flight_director_toggle");
         return;
     }
 
-    // FD FO: byte 0x04, bit 0x20 (inverted - pressed = OFF line, so pressed means switch is ON)
+    // FD FO: byte 0x04, bit 0x20; bit is HIGH when switch is ON
     if (byteOffset == 0x04 && bitMask == 0x20) {
         hwFDFoOn = state;
         maybeToggle("laminar/B738/autopilot/flight_director_fo_pos", hwFDFoOn, "laminar/B738/autopilot/flight_director_fo_toggle");
@@ -389,17 +398,21 @@ void ZiboPAP3MCPProfile::handleSwitchChanged(uint8_t byteOffset, uint8_t bitMask
         return;
     }
 
-    // AP DISCONNECT: byte 0x04, bit 0x80 = UP line (inverted), byte 0x05, bit 0x01 = DOWN line
+    // AP DISCONNECT: byte 0x04, bit 0x80 goes HIGH when bar is DOWN (disengaged),
+    // byte 0x05, bit 0x01 goes HIGH when bar is UP (re-engaged). Hardware bit naming
+    // is the inverse of physical position. Only act on rising edges.
     if (byteOffset == 0x04 && bitMask == 0x80) {
-        // UP line: pressed = engaged, released = disengaged
-        hwApDiscEngaged = !state;
-        maybeToggle("laminar/B738/autopilot/disconnect_pos", hwApDiscEngaged, "laminar/B738/autopilot/disconnect_toggle");
+        if (state) {
+            hwApDiscEngaged = false;
+            maybeToggle("laminar/B738/autopilot/disconnect_pos", hwApDiscEngaged, "laminar/B738/autopilot/disconnect_toggle");
+        }
         return;
     }
     if (byteOffset == 0x05 && bitMask == 0x01) {
-        // DOWN line: pressed = disengaged, released = engaged
-        hwApDiscEngaged = state;
-        maybeToggle("laminar/B738/autopilot/disconnect_pos", hwApDiscEngaged, "laminar/B738/autopilot/disconnect_toggle");
+        if (state) {
+            hwApDiscEngaged = true;
+            maybeToggle("laminar/B738/autopilot/disconnect_pos", hwApDiscEngaged, "laminar/B738/autopilot/disconnect_toggle");
+        }
         return;
     }
 }

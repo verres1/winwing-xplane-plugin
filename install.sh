@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Installation script for Winwing X-Plane plugin
+# Installation script for WINCTRL X-Plane plugin
 
 set -e
 
-PLUGIN_NAME="winwing"
+PLUGIN_NAME="winctrl"
 
 # Determine X-Plane path with priority: CLI argument > XPLANE_DIR env > prompt user
 if [ -n "$1" ]; then
@@ -77,6 +77,6 @@ echo "Plugin installed to: $PLUGIN_DIR/$PLATFORM_DIR/$PLUGIN_NAME.xpl"
 echo ""
 echo "To use the plugin:"
 echo "1. Start X-Plane"
-echo "2. The Winwing plugin will automatically detect your connected devices"
+echo "2. The WINCTRL plugin will automatically detect your connected devices"
 echo "3. Configure device profiles as needed"
 

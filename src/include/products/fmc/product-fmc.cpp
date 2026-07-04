@@ -6,46 +6,89 @@
 #include "plugins-menu.h"
 #include "profiles/ff767-fmc-profile.h"
 #include "profiles/ff777-fmc-profile.h"
+#include "profiles/fps748-fmc-profile.h"
 #include "profiles/ixeg733-fmc-profile.h"
-#include "profiles/laminar-airbus-fmc-profile.h"
+#include "profiles/jar330-fmc-profile.h"
+#include "profiles/laminar-a333-fmc-profile.h"
+#include "profiles/laminar-citx-fmc-profile.h"
 #include "profiles/rotatemd11-fmc-profile.h"
-#include "profiles/ssg748-fmc-profile.h"
+#include "profiles/sparky744-fmc-profile.h"
+#include "profiles/stratosphere77w-fmc-profile.h"
 #include "profiles/toliss-fmc-profile.h"
-#include "profiles/xcrafts-fmc-profile.h"
+#include "profiles/xcrafts-ejets-fmc-profile.h"
+#include "profiles/xcrafts-erj-fmc-profile.h"
 #include "profiles/zibo-fmc-profile.h"
+#include "usbcontroller.h"
 
 #include <chrono>
 #include <XPLMProcessing.h>
 
-ProductFMC::ProductFMC(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName, FMCHardwareType hardwareType, FMCDeviceVariant variant, unsigned char identifierByte) :
-    USBDevice(hidDevice, vendorId, productId, vendorName, productName), hardwareType(hardwareType), identifierByte(identifierByte), deviceVariant(variant) {
+ProductFMC::ProductFMC(HIDDeviceHandle hidDevice, uint16_t vendorId, uint16_t productId, std::string vendorName, std::string productName, FMCHardwareType hardwareType, FMCDeviceVariant variant, unsigned char identifierByte) : USBDevice(hidDevice, vendorId, productId, vendorName, productName), hardwareType(hardwareType), identifierByte(identifierByte), deviceVariant(variant) {
     profile = nullptr;
     page = std::vector<std::vector<char>>(ProductFMC::PageLines, std::vector<char>(ProductFMC::PageBytesPerLine, ' '));
     lastUpdateCycle = 0;
     lastButtonStateLo = 0;
     lastButtonStateHi = 0;
+    menuItemId = -1;
+    fontsMenuItemId = -1;
+
     pressedButtonIndices = {};
-    fontUpdatingEnabled = true;
 
     connect();
+
+#ifdef DEBUG
+    Dataref::getInstance()->createCommand(
+        PRODUCT_NAME "/debug/reload_active_font", "Reloads the active font on the FMC", [this](XPLMCommandPhase inPhase) {
+            if (inPhase != xplm_CommandBegin) {
+                return;
+            }
+
+            std::string fontFile = AppState::getInstance()->readPreference("FMCFont", "");
+            Logger::getInstance()->info("Reloading active font (\"%s\") on FMC...\n", fontFile.c_str());
+
+            setFont(preferredFontVariant);
+            updatePage(true);
+        });
+#endif
 }
 
 ProductFMC::~ProductFMC() {
-    disconnect();
+    AppState::getInstance()->cancelTasksForOwner(this);
+    blackout();
+    if (fontsMenuItemId >= 0) {
+        PluginsMenu::getInstance()->removeItem(fontsMenuItemId);
+        fontsMenuItemId = -1;
+    }
+    if (menuItemId >= 0) {
+        PluginsMenu::getInstance()->removeItem(menuItemId);
+    }
+    unloadProfile();
 }
 
 void ProductFMC::setProfileForCurrentAircraft() {
-    if (TolissFMCProfile::IsEligible()) {
+    if (JAR330FMCProfile::IsEligible()) {
+        clearDisplay();
+        profile = new JAR330FMCProfile(this);
+        profileReady = true;
+    } else if (TolissFMCProfile::IsEligible()) {
         clearDisplay();
         profile = new TolissFMCProfile(this);
         profileReady = true;
-    } else if (LaminarFMCProfile::IsEligible()) {
+    } else if (LaminarA333FMCProfile::IsEligible()) {
         clearDisplay();
-        profile = new LaminarFMCProfile(this);
+        profile = new LaminarA333FMCProfile(this);
         profileReady = true;
-    } else if (XCraftsFMCProfile::IsEligible()) {
+    } else if (LaminarCitXFMCProfile::IsEligible()) {
         clearDisplay();
-        profile = new XCraftsFMCProfile(this);
+        profile = new LaminarCitXFMCProfile(this);
+        profileReady = true;
+    } else if (XCraftsEjetsFMCProfile::IsEligible()) {
+        clearDisplay();
+        profile = new XCraftsEjetsFMCProfile(this);
+        profileReady = true;
+    } else if (XCraftsErjFMCProfile::IsEligible()) {
+        clearDisplay();
+        profile = new XCraftsErjFMCProfile(this);
         profileReady = true;
     } else if (ZiboFMCProfile::IsEligible()) {
         clearDisplay();
@@ -59,18 +102,29 @@ void ProductFMC::setProfileForCurrentAircraft() {
         clearDisplay();
         profile = new FlightFactor767FMCProfile(this);
         profileReady = true;
+    } else if (Strato77WFMCProfile::IsEligible()) {
+        clearDisplay();
+        profile = new Strato77WFMCProfile(this);
+        profileReady = true;
     } else if (FlightFactor777FMCProfile::IsEligible()) {
         clearDisplay();
         profile = new FlightFactor777FMCProfile(this);
         profileReady = true;
-    } else if (SSG748FMCProfile::IsEligible()) {
+    } else if (FPS748FMCProfile::IsEligible()) {
         clearDisplay();
-        profile = new SSG748FMCProfile(this);
+        profile = new FPS748FMCProfile(this);
+        profileReady = true;
+    } else if (SparkyB744FMCProfile::IsEligible()) {
+        clearDisplay();
+        profile = new SparkyB744FMCProfile(this);
         profileReady = true;
     } else if (IXEG733FMCProfile::IsEligible()) {
         clearDisplay();
         profile = new IXEG733FMCProfile(this);
         profileReady = true;
+    } else {
+        profile = nullptr;
+        profileReady = false;
     }
 }
 
@@ -86,6 +140,10 @@ const char *ProductFMC::classIdentifier() {
     }
 
     return "FMC (unknown hardware)";
+}
+
+const char *ProductFMC::activeProfileName() const {
+    return profile ? typeid(*profile).name() : "none";
 }
 
 bool ProductFMC::connect() {
@@ -114,20 +172,16 @@ bool ProductFMC::connect() {
         setLedBrightness(FMCLed::SCREEN_BACKLIGHT, 128);
         setLedBrightness(FMCLed::OVERALL_LEDS_BRIGHTNESS, 255);
         setAllLedsEnabled(false);
-        showBackground(FMCBackgroundVariant::WINWING_LOGO);
+        showBackground(FMCBackgroundVariant::WINCTRL_LOGO);
 
         setLedBrightness(FMCLed::MCDU_FAIL, 1);
         setLedBrightness(FMCLed::PFP_FAIL, 1);
-
-        if (!profile) {
-            setProfileForCurrentAircraft();
-        }
 
         std::vector<MenuItem> menuItems = {
             {.name = "Identify", .content = [this](int menuId) {
                  setLedBrightness(FMCLed::OVERALL_LEDS_BRIGHTNESS, 255);
                  setAllLedsEnabled(true);
-                 AppState::getInstance()->executeAfter(2000, [this]() {
+                 AppState::getInstance()->executeAfter(2000, this, [this]() {
                      setAllLedsEnabled(false);
                  });
              }},
@@ -152,23 +206,26 @@ bool ProductFMC::connect() {
         }
 
         menuItemId = PluginsMenu::getInstance()->addItem(classIdentifier(), menuItems);
+        reloadFontsMenu();
+
+        if (!profile) {
+            setProfileForCurrentAircraft();
+        }
+
         return true;
     }
 
     return false;
 }
 
-void ProductFMC::disconnect() {
-    PluginsMenu::getInstance()->removeItem(menuItemId);
+void ProductFMC::blackout() {
     setLedBrightness(FMCLed::BACKLIGHT, 0);
     setLedBrightness(FMCLed::SCREEN_BACKLIGHT, 0);
     setAllLedsEnabled(false);
     
     clearDisplay();
 
-    unloadProfile();
-
-    USBDevice::disconnect();
+    clearDisplay();
 }
 
 void ProductFMC::unloadProfile() {
@@ -205,15 +262,7 @@ void ProductFMC::didReceiveData(int reportId, uint8_t *report, int reportLength)
         return;
     }
 
-    if (reportId != 1 || reportLength < 13) { // We only handle report #1 for now.
-#if DEBUG
-//        printf("[%s] Ignoring reportId %d, length %d\n", classIdentifier(), reportId, reportLength);
-//        printf("[%s] Data (hex): ", classIdentifier());
-//        for (int i = 0; i < reportLength; ++i) {
-//            printf("%02X ", report[i]);
-//        }
-//        printf("\n");
-#endif
+    if (reportId != 1 || reportLength < 13) {
         return;
     }
 
@@ -249,6 +298,14 @@ void ProductFMC::didReceiveData(int reportId, uint8_t *report, int reportLength)
 void ProductFMC::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, uint8_t count) {
     USBDevice::didReceiveButton(hardwareButtonIndex, pressed, count);
 
+    if (!connected || !profile) {
+        return;
+    }
+
+    if (isButtonHandledByXPlane(hardwareButtonIndex)) {
+        return;
+    }
+
     bool pressedButtonIndexExists = pressedButtonIndices.find(hardwareButtonIndex) != pressedButtonIndices.end();
     XPLMCommandPhase command = -1;
     if (pressed && !pressedButtonIndexExists) {
@@ -269,8 +326,8 @@ void ProductFMC::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, ui
 
     FMCKey key = FMCHardwareMapping::ButtonIdentifierForIndex(hardwareType, hardwareButtonIndex);
     if (key == FMCKey::INVALID_UNKNOWN) {
-        // For reference, we often get: [Winwing] Received unknown key from hardwareType 1 - hardwareButtonIndex: 207
-        debug("Received unknown key from hardwareType %i - hardwareButtonIndex: %i\n", (int) hardwareType, hardwareButtonIndex);
+        // For reference, we often get: [WINCTRL] Received unknown key from hardwareType 1 - hardwareButtonIndex: 207
+        Logger::getInstance()->debug("Received unknown key from hardwareType %i - hardwareButtonIndex: %i\n", (int) hardwareType, hardwareButtonIndex);
         return;
     }
 
@@ -286,6 +343,10 @@ void ProductFMC::didReceiveButton(uint16_t hardwareButtonIndex, bool pressed, ui
 }
 
 void ProductFMC::updatePage(bool forceUpdate) {
+    if (!connected || !profile) {
+        return;
+    }
+
     auto datarefManager = Dataref::getInstance();
     bool shouldUpdate = forceUpdate;
 
@@ -304,6 +365,10 @@ void ProductFMC::updatePage(bool forceUpdate) {
 }
 
 void ProductFMC::draw(const std::vector<std::vector<char>> *pagePtr) {
+    if (!connected || !profile) {
+        return;
+    }
+
     const auto &p = pagePtr ? *pagePtr : page;
     std::vector<uint8_t> buf;
 
@@ -348,17 +413,30 @@ std::pair<uint8_t, uint8_t> ProductFMC::dataFromColFont(char color, bool fontSma
     return {static_cast<uint8_t>(value & 0xFF), static_cast<uint8_t>((value >> 8) & 0xFF)};
 }
 
+char ProductFMC::getPageCharacter(std::vector<std::vector<char>> &page, int line, int pos) {
+    if (line < 0 || line >= static_cast<int>(page.size()) || line >= ProductFMC::PageLines) {
+        return 0;
+    }
+
+    if (pos < 0 || pos >= ProductFMC::PageCharsPerLine) {
+        return 0;
+    }
+
+    pos = pos * ProductFMC::PageBytesPerChar;
+    return page[line][pos + ProductFMC::PageBytesPerChar - 1];
+}
+
 void ProductFMC::writeLineToPage(std::vector<std::vector<char>> &page, int line, int pos, const std::string &text, char color, bool fontSmall) {
     if (line < 0 || line >= ProductFMC::PageLines) {
-        debug("Not writing line %i: Line number is out of range!\n", line);
+        Logger::getInstance()->debug("Not writing line %i: Line number is out of range!\n", line);
         return;
     }
     if (pos < 0 || pos + text.length() > ProductFMC::PageCharsPerLine) {
-        debug("Not writing line %i: Position number (%i) is out of range!\n", line, pos);
+        Logger::getInstance()->debug("Not writing line %i: Position number (%i) is out of range!\n", line, pos);
         return;
     }
     if (text.length() > ProductFMC::PageCharsPerLine) {
-        debug("Not writing line %i: Text is too long (%lu) for line.\n", line, text.length());
+        Logger::getInstance()->debug("Not writing line %i: Text is too long (%lu) for line.\n", line, text.length());
         return;
     }
 
@@ -372,7 +450,7 @@ void ProductFMC::writeLineToPage(std::vector<std::vector<char>> &page, int line,
 
 void ProductFMC::clearDisplay() {
     page = std::vector<std::vector<char>>(ProductFMC::PageLines, std::vector<char>(ProductFMC::PageBytesPerLine, ' '));
-    
+
     std::vector<uint8_t> blankLine = {};
     blankLine.push_back(0xf2);
     for (int i = 0; i < ProductFMC::PageCharsPerLine; ++i) {
@@ -386,8 +464,59 @@ void ProductFMC::clearDisplay() {
     }
 }
 
-void ProductFMC::setFont(std::vector<std::vector<unsigned char>> font) {
-    if (!fontUpdatingEnabled) {
+void ProductFMC::setFont(FontVariant preferredVariant) {
+    std::string fontPreference = AppState::getInstance()->readPreference("FMCFont", "default");
+
+    if (fontPreference == "no_font") {
+        return;
+    }
+
+    preferredFontVariant = preferredVariant;
+    bool shouldLoadDefaultFont = fontPreference == "default";
+    if (!shouldLoadDefaultFont && !Font::IsCustomFontAvailable(fontPreference)) {
+        Logger::getInstance()->error("Font file not found for font '%s'\n", fontPreference.c_str());
+        AppState::getInstance()->writePreference("FMCFont", "default");
+        shouldLoadDefaultFont = true;
+    }
+
+    std::vector<std::vector<unsigned char>> font = {};
+    if (shouldLoadDefaultFont) {
+        font = Font::GlyphData(preferredVariant, identifierByte, hardwareType);
+    } else {
+        font = Font::GlyphData(fontPreference, identifierByte, hardwareType);
+    }
+
+    if (font.empty()) {
+        Logger::getInstance()->error("Failed to load font data for font '%s'\n", fontPreference.c_str());
+        AppState::getInstance()->writePreference("FMCFont", "default");
+        return;
+    }
+
+    // Apply the SimAppPro "Screen Layout" for the connected hardware so the 14 display
+    // rows line up with the physical LSK keys. ResizeCellHeight is best-effort: it
+    // no-ops at the authored height (MCDU 29) and leaves `font` untouched if it cannot
+    // parse the structure, so we always send whatever we have.
+    FMCScreenLayout layout = FMCHardwareMapping::ScreenLayoutForHardware(hardwareType);
+    Font::ResizeCellHeight(font, layout.characterHeight, layout.characterWidth);
+
+    for (auto &fontBytes : font) {
+        writeData(fontBytes);
+    }
+
+    showBackground(FMCBackgroundVariant::BLACK);
+
+    setScreenPosition(layout.x, layout.y);
+}
+
+void ProductFMC::setScreenLayout(FontVariant variant, unsigned char characterHeight, unsigned char characterWidth, unsigned char x, unsigned char y) {
+    preferredFontVariant = variant;
+    std::vector<std::vector<unsigned char>> font = Font::GlyphData(variant, identifierByte, hardwareType);
+    if (font.empty()) {
+        Logger::getInstance()->error("setScreenLayout: failed to load font data\n");
+        return;
+    }
+
+    if (!Font::ResizeCellHeight(font, characterHeight, characterWidth)) {
         return;
     }
 
@@ -396,6 +525,40 @@ void ProductFMC::setFont(std::vector<std::vector<unsigned char>> font) {
     }
 
     showBackground(FMCBackgroundVariant::BLACK);
+
+    // Screen position belongs with the character size: apply it in the same update.
+    setScreenPosition(x, y);
+}
+
+void ProductFMC::setScreenPosition(unsigned char x, unsigned char y) {
+    // SAP "Screen Layout Settings" position update: one 0x2a packet carrying the
+    // 0x18 text-grid block (25 bytes) + COMMIT (17 bytes) = 42 = 0x2a.
+    // left = x + 36, top = y + 20 (verified from SAP captures).
+    std::vector<unsigned char> packet(64, 0);
+    packet[0] = 0xf0;
+    packet[1] = 0x00;
+    packet[2] = 0x00; // sequence (tolerant)
+    packet[3] = 0x2a; // TYPE = 42 meaningful bytes
+
+    // 0x18 grid block at payload offset 0 (packet byte 4)
+    unsigned char *p = packet.data() + 4;
+    p[ 0] = identifierByte; p[ 1] = 0xbb; p[ 2] = 0x00; p[ 3] = 0x00;
+    p[ 4] = 0x18;           p[ 5] = 0x01; p[ 6] = 0x00; p[ 7] = 0x00;
+    p[ 8] = 0x00; p[ 9] = 0x00; p[10] = 0x00; p[11] = 0x00; // addr (tolerant = 0)
+    p[12] = 0x00;
+    p[13] = 0x08; p[14] = 0x00; p[15] = 0x00; p[16] = 0x00; // payload length = 8
+    p[17] = static_cast<unsigned char>(36 + x); p[18] = 0x00; // left as LE uint16
+    p[19] = static_cast<unsigned char>(20 + y); p[20] = 0x00; // top as LE uint16
+    p[21] = 0x0e; p[22] = 0x00; p[23] = 0x18; p[24] = 0x00; // 14 cols, 24 rows
+
+    // COMMIT block at payload offset 25 (packet byte 29)
+    unsigned char *c = packet.data() + 29;
+    c[ 0] = identifierByte; c[ 1] = 0xbb; c[ 2] = 0x00; c[ 3] = 0x00;
+    c[ 4] = 0x05;           c[ 5] = 0x01; c[ 6] = 0x00; c[ 7] = 0x00;
+    c[ 8] = 0x00; c[ 9] = 0x00; c[10] = 0x00; c[11] = 0x00; // addr
+    c[12] = 0x01; c[13] = 0x00; c[14] = 0x00; c[15] = 0x00; c[16] = 0x00;
+
+    writeData(packet);
 }
 
 void ProductFMC::showBackground(FMCBackgroundVariant variant) {
@@ -430,7 +593,7 @@ void ProductFMC::showBackground(FMCBackgroundVariant variant) {
             data = {0xf0, 0x00, 0x09, 0x12, identifierByte, 0xbb, 0x00, 0x00, 0x04, 0x01, 0x00, 0x00, 0x05, 0xa7, 0x09, 0x00};
             break;
 
-        case FMCBackgroundVariant::WINWING_LOGO:
+        case FMCBackgroundVariant::WINCTRL_LOGO:
             data = {0xf0, 0x00, 0x0a, 0x12, identifierByte, 0xbb, 0x00, 0x00, 0x04, 0x01, 0x00, 0x00, 0xd4, 0xac, 0x09, 0x00};
             break;
 
@@ -480,8 +643,87 @@ void ProductFMC::setDeviceVariant(FMCDeviceVariant variant) {
     writeData({0x02, identifierByte, 0xbb, 0x00, 0x00, 0x04, 0x05, 0xcc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
     writeData({0x02, identifierByte, 0xbb, 0x00, 0x00, 0x08, 0x06, 0xcc, 0x00, 0x00, 0x01, static_cast<uint8_t>(variant), 0xff, 0xff});
 
-    // After writing, disconnect and mark as not ready so USBController will remove us from devices array
-    // We disconnect because the device ceases to exist after changing variant.
+    // Mark as not ready. The firmware reprogramming causes the device to
+    // physically disconnect and reconnect under a different USB product ID.
+    // The OS removal callback (macOS) or poll (Windows) handles full cleanup;
+    // calling disconnect() here would null hidDevice and break the callback's
+    // device-lookup by handle, causing the old menu entry to leak.
     profileReady = false;
-    disconnect();
+}
+
+void ProductFMC::reloadFontsMenu() {
+    if (menuItemId < 0) {
+        return;
+    }
+
+    if (fontsMenuItemId >= 0) {
+        PluginsMenu::getInstance()->removeItem(fontsMenuItemId);
+        fontsMenuItemId = -1;
+    }
+
+    std::vector<std::string> customFontFiles = Font::ReadCustomFontFiles();
+    std::string fmcFontPreference = AppState::getInstance()->readPreference("FMCFont", "default");
+    std::vector<MenuItem> fontMenuItems = {
+        {
+            .name = "Managed by plugin",
+            .checked = fmcFontPreference == "default",
+            .content = [this](int itemId) {
+                AppState::getInstance()->writePreference("FMCFont", "default");
+                PluginsMenu::getInstance()->uncheckSubmenuSiblings(itemId);
+                PluginsMenu::getInstance()->setItemChecked(itemId, true);
+
+                setFont(preferredFontVariant);
+                updatePage(true);
+            },
+        },
+        {
+            .name = "No custom font (reconnect USB)",
+            .checked = fmcFontPreference == "no_font",
+            .content = [this](int itemId) {
+                AppState::getInstance()->writePreference("FMCFont", "no_font");
+                PluginsMenu::getInstance()->uncheckSubmenuSiblings(itemId);
+                PluginsMenu::getInstance()->setItemChecked(itemId, true);
+
+                // No font updating - expect USB reconnect to clear the custom font.
+            },
+        },
+        MenuItem::Separator(),
+        {
+            .name = "Reload font list",
+            .checked = false,
+            .content = [this](int itemId) {
+                reloadFontsMenu();
+            },
+        },
+    };
+
+    if (customFontFiles.size() > 0) {
+        fontMenuItems.push_back(MenuItem::Separator());
+
+        for (const std::string &fontFile : customFontFiles) {
+            // Clean up font file name by removing whitespace and control characters
+            std::string cleanName = fontFile;
+            cleanName.erase(std::remove_if(cleanName.begin(), cleanName.end(),
+                                [](unsigned char c) {
+                                    return std::isspace(c) || std::iscntrl(c);
+                                }),
+                cleanName.end());
+
+            fontMenuItems.push_back(
+                {
+                    .name = cleanName,
+                    .checked = fmcFontPreference == fontFile,
+                    .content = [this, fontFile](int itemId) {
+                        AppState::getInstance()->writePreference("FMCFont", fontFile);
+                        PluginsMenu::getInstance()->uncheckSubmenuSiblings(itemId);
+                        PluginsMenu::getInstance()->setItemChecked(itemId, true);
+
+                        setFont(preferredFontVariant);
+                        updatePage(true);
+                    },
+                });
+        }
+    }
+
+    fontsMenuItemId = PluginsMenu::getInstance()->addItem("Display font", fontMenuItems, false, menuItemId);
 }

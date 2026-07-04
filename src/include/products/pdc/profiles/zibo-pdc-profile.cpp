@@ -6,9 +6,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <XPLMProcessing.h>
 
 ZiboPDCProfile::ZiboPDCProfile(ProductPDC *product) : PDCAircraftProfile(product) {
-    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("laminar/B738/electric/panel_brightness", [this, product](std::vector<float> panelBrightness) {
+    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("laminar/B738/electric/panel_brightness", [this, product](const std::vector<float> &panelBrightness) {
         if (panelBrightness.size() < 1) {
             return;
         }
@@ -20,77 +21,99 @@ ZiboPDCProfile::ZiboPDCProfile(ProductPDC *product) : PDCAircraftProfile(product
         product->setLedBrightness(PDCLed::BACKLIGHT, brightness);
 
         product->forceStateSync();
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("sim/cockpit/electrical/avionics_on", [product](bool hasPower) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("laminar/B738/electric/panel_brightness");
-    });
+    },
+        this);
 
-    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("laminar/B738/dspl_light_test", [this](std::vector<float> displayTest) {
+    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("laminar/B738/dspl_light_test", [this](const std::vector<float> &displayTest) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("laminar/B738/electric/panel_brightness");
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("laminar/B738/electric/main_bus", [product](bool hasPower) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("sim/cockpit/electrical/avionics_on");
-    });
-}
-
-ZiboPDCProfile::~ZiboPDCProfile() {
-    Dataref::getInstance()->unbind("laminar/B738/electric/panel_brightness");
-    Dataref::getInstance()->unbind("sim/cockpit/electrical/avionics_on");
-    Dataref::getInstance()->unbind("laminar/B738/dspl_light_test");
-    Dataref::getInstance()->unbind("laminar/B738/electric/main_bus");
+    },
+        this);
 }
 
 bool ZiboPDCProfile::IsEligible() {
-    return Dataref::getInstance()->exists("laminar/B738/autopilot/mcp_speed_dial_kts_mach");
+    return Dataref::getInstance()->exists("zibomod/Aircraft_Path");
 }
 
-const std::unordered_map<uint16_t, PDCButtonDef> &ZiboPDCProfile::buttonDefs() const {
-    static const std::unordered_map<uint16_t, PDCButtonDef> buttons = {
-        {0, {"FPV", "laminar/B738/EFIS_control/capt/push_button/fpv_press"}},
-        {1, {"MTRS", "laminar/B738/EFIS_control/capt/push_button/mtrs_press"}},
-        {2, {"VSD", ""}},
-        {3, {"WXR", "laminar/B738/EFIS_control/capt/push_button/wxr_press"}},
-        {4, {"STA", "laminar/B738/EFIS_control/capt/push_button/sta_press"}},
-        {5, {"WPT", "laminar/B738/EFIS_control/capt/push_button/wpt_press"}},
-        {6, {"ARPT", "laminar/B738/EFIS_control/capt/push_button/arpt_press"}},
-        {7, {"DATA", "laminar/B738/EFIS_control/capt/push_button/data_press"}},
-        {8, {"POS", "laminar/B738/EFIS_control/capt/push_button/pos_press"}},
-        {9, {"TERR", "laminar/B738/EFIS_control/capt/push_button/terr_press"}},
-        {10, {"LEFT VOR1", "laminar/B738/EFIS_control/capt/vor1_off_pos,laminar/B738/EFIS_control/capt/vor1_off_dn,laminar/B738/EFIS_control/capt/vor1_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 1.0}},
-        {11, {"LEFT OFF", "laminar/B738/EFIS_control/capt/vor1_off_pos,laminar/B738/EFIS_control/capt/vor1_off_dn,laminar/B738/EFIS_control/capt/vor1_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 0.0}},
-        {12, {"LEFT ADF1", "laminar/B738/EFIS_control/capt/vor1_off_pos,laminar/B738/EFIS_control/capt/vor1_off_dn,laminar/B738/EFIS_control/capt/vor1_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, -1.0}},
-        {13, {"RIGHT VOR2", "laminar/B738/EFIS_control/capt/vor2_off_pos,laminar/B738/EFIS_control/capt/vor2_off_dn,laminar/B738/EFIS_control/capt/vor2_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 1.0}},
-        {14, {"RIGHT OFF", "laminar/B738/EFIS_control/capt/vor2_off_pos,laminar/B738/EFIS_control/capt/vor2_off_dn,laminar/B738/EFIS_control/capt/vor2_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 0.0}},
-        {15, {"RIGHT ADF2", "laminar/B738/EFIS_control/capt/vor2_off_pos,laminar/B738/EFIS_control/capt/vor2_off_dn,laminar/B738/EFIS_control/capt/vor2_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, -1.0}},
-        {16, {"BARO RST", "laminar/B738/EFIS_control/capt/push_button/rst_press"}},
-        {17, {"VOR MAP CTR", "laminar/B738/EFIS_control/capt/push_button/ctr_press"}},
-        {18, {"RANGE TFC", "laminar/B738/EFIS_control/capt/push_button/tfc_press"}},
-        {19, {"BARO STD", "laminar/B738/EFIS_control/capt/push_button/std_press"}},
-        {20, {"PDC3M RANGE MINUS", "laminar/B738/EFIS_control/capt/map_range_dn"}}, // PDC3N - laminar/B738/EFIS/capt/map_range,0,1,2,3,4,5,6,7
-        {21, {"PDC3M RANGE PLUS", "laminar/B738/EFIS_control/capt/map_range_up"}},
-        {22, {"BARO knob left fast", "laminar/B738/pilot/barometer_dn_fast", PDCDatarefType::EXECUTE_CMD_PHASED}},
-        {23, {"BARO knob right fast", "laminar/B738/pilot/barometer_up_fast", PDCDatarefType::EXECUTE_CMD_PHASED}},
-        {24, {"MINS RADIO", "laminar/B738/EFIS_control/cpt/minimums,laminar/B738/EFIS_control/cpt/minimums_up,laminar/B738/EFIS_control/cpt/minimums_dn", PDCDatarefType::SET_VALUE_USING_COMMANDS, 0.0}}, // Caution, up and down are inverted
-        {25, {"MINS BARO", "laminar/B738/EFIS_control/cpt/minimums,laminar/B738/EFIS_control/cpt/minimums_up,laminar/B738/EFIS_control/cpt/minimums_dn", PDCDatarefType::SET_VALUE_USING_COMMANDS, 1.0}},  // Caution, up and down are inverted
-        {26, {"Baro inHg", "laminar/B738/EFIS_control/capt/baro_in_hpa,laminar/B738/EFIS_control/capt/baro_in_hpa_dn,laminar/B738/EFIS_control/capt/baro_in_hpa_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 0.0}},
-        {27, {"Baro HPA", "laminar/B738/EFIS_control/capt/baro_in_hpa,laminar/B738/EFIS_control/capt/baro_in_hpa_dn,laminar/B738/EFIS_control/capt/baro_in_hpa_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 1.0}},
-        {28, {"Map APP", "laminar/B738/EFIS_control/capt/map_mode_pos", PDCDatarefType::SET_VALUE, 0.0}},
-        {29, {"Map VOR", "laminar/B738/EFIS_control/capt/map_mode_pos", PDCDatarefType::SET_VALUE, 1.0}},
-        {30, {"Map MAP", "laminar/B738/EFIS_control/capt/map_mode_pos", PDCDatarefType::SET_VALUE, 2.0}},
-        {31, {"Map PLN", "laminar/B738/EFIS_control/capt/map_mode_pos", PDCDatarefType::SET_VALUE, 3.0}},
-        {32, {"Mins knob left fast", "laminar/B738/pfd/dh_pilot_dn_fast", PDCDatarefType::EXECUTE_CMD_PHASED}},
-        {33, {"Mins knob left slow", "laminar/B738/pfd/dh_pilot_dn_slow", PDCDatarefType::EXECUTE_CMD_PHASED}},
-        {34, {"Mins knob center", ""}},
-        {35, {"Mins knob right slow", "laminar/B738/pfd/dh_pilot_up_slow", PDCDatarefType::EXECUTE_CMD_PHASED}},
-        {36, {"Mins knob right fast", "laminar/B738/pfd/dh_pilot_up_fast", PDCDatarefType::EXECUTE_CMD_PHASED}},
-        {37, {"BARO knob left slow", "laminar/B738/pilot/barometer_dn_slow", PDCDatarefType::EXECUTE_CMD_PHASED}},
-        {38, {"BARO knob center", ""}},
-        {39, {"BARO knob right slow", "laminar/B738/pilot/barometer_up_slow", PDCDatarefType::EXECUTE_CMD_PHASED}},
-    };
+const std::unordered_map<PDCButtonIndex3N3M, PDCButtonDef> &ZiboPDCProfile::buttonDefs() const {
+    const std::string pilotSide = product->deviceVariant == PDCDeviceVariant::VARIANT_3N_CAPTAIN || product->deviceVariant == PDCDeviceVariant::VARIANT_3M_CAPTAIN ? "capt" : "fo";
+    const std::string pilotOrCopilot = pilotSide == "capt" ? "pilot" : "copilot";
+    const std::string cptOrFo = pilotSide == "capt" ? "cpt" : "fo";
+    static std::unordered_map<PDCDeviceVariant, std::unordered_map<PDCButtonIndex3N3M, PDCButtonDef>> cache;
 
-    return buttons;
+    return cache.try_emplace(product->deviceVariant,
+                    std::unordered_map<PDCButtonIndex3N3M, PDCButtonDef>{
+                        {{0, 0}, {"FPV", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/fpv_press"}},
+                        {{1, 1}, {"MTRS", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/mtrs_press"}},
+                        {{-1, 2}, {"3M VSD", ""}},
+                        {{2, 3}, {"WXR", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/wxr_press"}},
+                        {{3, 4}, {"STA", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/sta_press"}},
+                        {{4, 5}, {"WPT", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/wpt_press"}},
+                        {{5, 6}, {"ARPT", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/arpt_press"}},
+                        {{6, 7}, {"DATA", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/data_press"}},
+                        {{7, 8}, {"POS", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/pos_press"}},
+                        {{8, 9}, {"TERR", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/terr_press"}},
+                        {{9, 10}, {"LEFT VOR1", "laminar/B738/EFIS_control/" + pilotSide + "/vor1_off_pos,laminar/B738/EFIS_control/" + pilotSide + "/vor1_off_dn,laminar/B738/EFIS_control/" + pilotSide + "/vor1_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 1.0}},
+                        {{10, 11}, {"LEFT OFF", "laminar/B738/EFIS_control/" + pilotSide + "/vor1_off_pos,laminar/B738/EFIS_control/" + pilotSide + "/vor1_off_dn,laminar/B738/EFIS_control/" + pilotSide + "/vor1_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 0.0}},
+                        {{11, 12}, {"LEFT ADF1", "laminar/B738/EFIS_control/" + pilotSide + "/vor1_off_pos,laminar/B738/EFIS_control/" + pilotSide + "/vor1_off_dn,laminar/B738/EFIS_control/" + pilotSide + "/vor1_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, -1.0}},
+                        {{12, 13}, {"RIGHT VOR2", "laminar/B738/EFIS_control/" + pilotSide + "/vor2_off_pos,laminar/B738/EFIS_control/" + pilotSide + "/vor2_off_dn,laminar/B738/EFIS_control/" + pilotSide + "/vor2_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 1.0}},
+                        {{13, 14}, {"RIGHT OFF", "laminar/B738/EFIS_control/" + pilotSide + "/vor2_off_pos,laminar/B738/EFIS_control/" + pilotSide + "/vor2_off_dn,laminar/B738/EFIS_control/" + pilotSide + "/vor2_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 0.0}},
+                        {{14, 15}, {"RIGHT ADF2", "laminar/B738/EFIS_control/" + pilotSide + "/vor2_off_pos,laminar/B738/EFIS_control/" + pilotSide + "/vor2_off_dn,laminar/B738/EFIS_control/" + pilotSide + "/vor2_off_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, -1.0}},
+                        {{15, 16}, {"Mins RST", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/rst_press"}},
+                        {{16, 17}, {"VOR MAP CTR", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/ctr_press"}},
+                        {{17, 18}, {"RANGE TFC", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/tfc_press"}},
+                        {{18, 19}, {"Baro STD", "laminar/B738/EFIS_control/" + pilotSide + "/push_button/std_press"}},
+                        {{-1, 20}, {"3M Range Minus", "laminar/B738/EFIS_control/" + pilotSide + "/map_range_dn"}}, // PDC3N - laminar/B738/EFIS/"+pilotSide+"/map_range,0,1,2,3,4,5,6,7
+                        {{-1, 21}, {"3M Range Plus", "laminar/B738/EFIS_control/" + pilotSide + "/map_range_up"}},
+                        {{21, 22}, {"Baro knob left fast", "laminar/B738/" + pilotOrCopilot + "/barometer_down", PDCDatarefType::EXECUTE_CMD_PHASED}},
+                        {{22, 23}, {"Baro knob right fast", "laminar/B738/" + pilotOrCopilot + "/barometer_up", PDCDatarefType::EXECUTE_CMD_PHASED}},
+                        {{23, 24}, {"Mins RADIO", "laminar/B738/EFIS_control/" + cptOrFo + "/minimums,laminar/B738/EFIS_control/" + cptOrFo + "/minimums_up,laminar/B738/EFIS_control/" + cptOrFo + "/minimums_dn", PDCDatarefType::SET_VALUE_USING_COMMANDS, 0.0}}, // Caution, up and down are inverted
+                        {{24, 25}, {"Mins BARO", "laminar/B738/EFIS_control/" + cptOrFo + "/minimums,laminar/B738/EFIS_control/" + cptOrFo + "/minimums_up,laminar/B738/EFIS_control/" + cptOrFo + "/minimums_dn", PDCDatarefType::SET_VALUE_USING_COMMANDS, 1.0}},  // Caution, up and down are inverted
+                        {{25, 26}, {"Baro inHg", "laminar/B738/EFIS_control/" + pilotSide + "/baro_in_hpa,laminar/B738/EFIS_control/" + pilotSide + "/baro_in_hpa_dn,laminar/B738/EFIS_control/" + pilotSide + "/baro_in_hpa_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 0.0}},
+                        {{26, 27}, {"Baro HPA", "laminar/B738/EFIS_control/" + pilotSide + "/baro_in_hpa,laminar/B738/EFIS_control/" + pilotSide + "/baro_in_hpa_dn,laminar/B738/EFIS_control/" + pilotSide + "/baro_in_hpa_up", PDCDatarefType::SET_VALUE_USING_COMMANDS, 1.0}},
+                        {{27, 28}, {"Map APP", "laminar/B738/EFIS_control/" + pilotSide + "/map_mode_pos", PDCDatarefType::SET_VALUE, 0.0}},
+                        {{28, 29}, {"Map VOR", "laminar/B738/EFIS_control/" + pilotSide + "/map_mode_pos", PDCDatarefType::SET_VALUE, 1.0}},
+                        {{29, 30}, {"Map MAP", "laminar/B738/EFIS_control/" + pilotSide + "/map_mode_pos", PDCDatarefType::SET_VALUE, 2.0}},
+                        {{30, 31}, {"Map PLN", "laminar/B738/EFIS_control/" + pilotSide + "/map_mode_pos", PDCDatarefType::SET_VALUE, 3.0}},
+                        {{31, -1}, {"3N Map range 5", "laminar/B738/EFIS/" + pilotSide + "/map_range", PDCDatarefType::SET_VALUE, 0.0}},
+                        {{32, -1}, {"3N Map range 10", "laminar/B738/EFIS/" + pilotSide + "/map_range", PDCDatarefType::SET_VALUE, 1.0}},
+                        {{33, -1}, {"3N Map range 20", "laminar/B738/EFIS/" + pilotSide + "/map_range", PDCDatarefType::SET_VALUE, 2.0}},
+                        {{34, -1}, {"3N Map range 40", "laminar/B738/EFIS/" + pilotSide + "/map_range", PDCDatarefType::SET_VALUE, 3.0}},
+                        {{35, -1}, {"3N Map range 80", "laminar/B738/EFIS/" + pilotSide + "/map_range", PDCDatarefType::SET_VALUE, 4.0}},
+                        {{36, -1}, {"3N Map range 160", "laminar/B738/EFIS/" + pilotSide + "/map_range", PDCDatarefType::SET_VALUE, 5.0}},
+                        {{37, -1}, {"3N Map range 320", "laminar/B738/EFIS/" + pilotSide + "/map_range", PDCDatarefType::SET_VALUE, 6.0}},
+                        {{38, -1}, {"3N Map range 640", "laminar/B738/EFIS/" + pilotSide + "/map_range", PDCDatarefType::SET_VALUE, 7.0}},
+                        {{19, 32}, {"Mins knob left fast", std::string("laminar/B738/pfd/dh_") + pilotOrCopilot + "_dn", PDCDatarefType::EXECUTE_CMD_PHASED}},
+                        {{39, 33}, {"Mins knob left slow", "custom", PDCDatarefType::ADD_MINIMUMS_REPEATING, -1.0}},
+                        {{40, 34}, {"Mins knob center", ""}},
+                        {{41, 35}, {"Mins knob right slow", "custom", PDCDatarefType::ADD_MINIMUMS_REPEATING, 1.0}},
+                        {{20, 36}, {"Mins knob right fast", std::string("laminar/B738/pfd/dh_") + pilotOrCopilot + "_up", PDCDatarefType::EXECUTE_CMD_PHASED}},
+                        {{42, 37}, {"Baro knob left slow", "custom", PDCDatarefType::ADD_BARO_REPEATING, -1.0}},
+                        {{43, 38}, {"Baro knob center", ""}},
+                        {{44, 39}, {"Baro knob right slow", "custom", PDCDatarefType::ADD_BARO_REPEATING, 1.0}},
+                    })
+        .first->second;
+}
+
+void ZiboPDCProfile::update() {
+    if (minimumsDelta != 0 && XPLMGetElapsedTime() - minimumsLastCommandTime >= 0.1f) {
+        minimumsLastCommandTime = XPLMGetElapsedTime();
+        changeMinimums();
+    }
+
+    if (baroDelta != 0 && XPLMGetElapsedTime() - baroLastCommandTime >= 0.1f) {
+        baroLastCommandTime = XPLMGetElapsedTime();
+        changeBaro();
+    }
 }
 
 void ZiboPDCProfile::buttonPressed(const PDCButtonDef *button, XPLMCommandPhase phase) {
@@ -100,7 +123,15 @@ void ZiboPDCProfile::buttonPressed(const PDCButtonDef *button, XPLMCommandPhase 
 
     auto datarefManager = Dataref::getInstance();
 
-    if (phase == xplm_CommandBegin && button->datarefType == PDCDatarefType::SET_VALUE_USING_COMMANDS) {
+    if (button->datarefType == PDCDatarefType::ADD_BARO_REPEATING) {
+        baroDelta = phase == xplm_CommandBegin ? static_cast<char>(button->value) : 0;
+        baroLastCommandTime = XPLMGetElapsedTime() + 1.0f;
+        changeBaro();
+    } else if (button->datarefType == PDCDatarefType::ADD_MINIMUMS_REPEATING) {
+        minimumsDelta = phase == xplm_CommandBegin ? static_cast<char>(button->value) : 0;
+        minimumsLastCommandTime = XPLMGetElapsedTime() + 1.0f;
+        changeMinimums();
+    } else if (phase == xplm_CommandBegin && button->datarefType == PDCDatarefType::SET_VALUE_USING_COMMANDS) {
         std::stringstream ss(button->dataref);
         std::string item;
         std::vector<std::string> parts;
@@ -126,11 +157,40 @@ void ZiboPDCProfile::buttonPressed(const PDCButtonDef *button, XPLMCommandPhase 
         }
 
     } else if (phase == xplm_CommandBegin && button->datarefType == PDCDatarefType::SET_VALUE) {
-        datarefManager->set<float>(button->dataref.c_str(), button->value);
+        datarefManager->set<double>(button->dataref.c_str(), button->value);
 
     } else if (phase == xplm_CommandBegin && button->datarefType == PDCDatarefType::EXECUTE_CMD_ONCE) {
         datarefManager->executeCommand(button->dataref.c_str());
-    } else if (phase == xplm_CommandBegin && button->datarefType == PDCDatarefType::EXECUTE_CMD_PHASED) {
+    } else if (button->datarefType == PDCDatarefType::EXECUTE_CMD_PHASED) {
         datarefManager->executeCommand(button->dataref.c_str(), phase);
     }
+}
+
+void ZiboPDCProfile::changeMinimums() {
+    if (minimumsDelta == 0) {
+        return;
+    }
+
+    std::string dataref = std::string("laminar/B738/pfd/dh_") + (product->deviceVariant == PDCDeviceVariant::VARIANT_3N_CAPTAIN || product->deviceVariant == PDCDeviceVariant::VARIANT_3M_CAPTAIN ? "pilot" : "copilot");
+    auto datarefManager = Dataref::getInstance();
+    float currentMins = datarefManager->get<float>(dataref.c_str());
+    currentMins += minimumsDelta;
+    datarefManager->set<float>(dataref.c_str(), currentMins);
+}
+
+void ZiboPDCProfile::changeBaro() {
+    if (baroDelta == 0) {
+        return;
+    }
+
+    auto datarefManager = Dataref::getInstance();
+    bool isHPA = datarefManager->get<bool>((std::string("laminar/B738/EFIS_control/") + (product->deviceVariant == PDCDeviceVariant::VARIANT_3N_CAPTAIN || product->deviceVariant == PDCDeviceVariant::VARIANT_3M_CAPTAIN ? "capt" : "fo") + "/baro_in_hpa").c_str());
+    std::string dataref = std::string("laminar/B738/EFIS/baro_sel_in_hg_") + (product->deviceVariant == PDCDeviceVariant::VARIANT_3N_CAPTAIN || product->deviceVariant == PDCDeviceVariant::VARIANT_3M_CAPTAIN ? "pilot" : "copilot");
+    float currentBaroInHg = datarefManager->get<float>(dataref.c_str());
+    if (isHPA) {
+        currentBaroInHg += baroDelta * 0.02953f;
+    } else {
+        currentBaroInHg += baroDelta * 0.01f;
+    }
+    datarefManager->set<float>(dataref.c_str(), currentBaroInHg);
 }

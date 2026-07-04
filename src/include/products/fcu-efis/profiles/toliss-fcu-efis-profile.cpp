@@ -12,7 +12,7 @@
 #include <XPLMUtilities.h>
 
 TolissFCUEfisProfile::TolissFCUEfisProfile(ProductFCUEfis *product) : FCUEfisAircraftProfile(product) {
-    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/SupplLightLevelRehostats", [product](std::vector<float> brightness) {
+    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/SupplLightLevelRehostats", [product](const std::vector<float> &brightness) {
         if (brightness.size() < 2) {
             return;
         }
@@ -37,7 +37,8 @@ TolissFCUEfisProfile::TolissFCUEfisProfile(ProductFCUEfis *product) : FCUEfisAir
         product->setLedBrightness(FCUEfisLed::EFISL_SCREEN_BACKLIGHT, screenBrightness);
 
         product->forceStateSync();
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<int>("AirbusFBW/AnnunMode", [this](int annunMode) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/SupplLightLevelRehostats");
@@ -47,7 +48,7 @@ TolissFCUEfisProfile::TolissFCUEfisProfile(ProductFCUEfis *product) : FCUEfisAir
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/ATHRmode");
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/LOCilluminated");
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/APPRilluminated");
-        Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/APVerticalMode");
+        Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/OHPLightsATA31_Raw");
 
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/FD2Engage");
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/ILSonFO");
@@ -64,126 +65,121 @@ TolissFCUEfisProfile::TolissFCUEfisProfile(ProductFCUEfis *product) : FCUEfisAir
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/NDShowVORDCapt");
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/NDShowNDBCapt");
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/NDShowARPTCapt");
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/FCUAvail", [](bool poweredOn) {
         Dataref::getInstance()->executeChangedCallbacksForDataref("AirbusFBW/AnnunMode");
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/AP1Engage", [this, product](bool engaged) {
         product->setLedBrightness(FCUEfisLed::AP1_GREEN, engaged || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/AP2Engage", [this, product](bool engaged) {
         product->setLedBrightness(FCUEfisLed::AP2_GREEN, engaged || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<int>("AirbusFBW/ATHRmode", [this, product](int mode) {
         product->setLedBrightness(FCUEfisLed::ATHR_GREEN, mode > 0 || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/LOCilluminated", [this, product](bool illuminated) {
         product->setLedBrightness(FCUEfisLed::LOC_GREEN, illuminated || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/APPRilluminated", [this, product](bool illuminated) {
         product->setLedBrightness(FCUEfisLed::APPR_GREEN, illuminated || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
-    Dataref::getInstance()->monitorExistingDataref<int>("AirbusFBW/APVerticalMode", [this, product](int vsMode) {
-        bool expedEnabled = vsMode >= 0 && vsMode & 0b00010000;
-        product->setLedBrightness(FCUEfisLed::EXPED_GREEN, expedEnabled || isAnnunTest() ? 1 : 0);
-    });
+    Dataref::getInstance()->monitorExistingDataref<std::vector<float>>("AirbusFBW/OHPLightsATA31_Raw", [this, product](const std::vector<float> &panelLights) {
+        if (panelLights.size() < 52) {
+            return;
+        }
+
+        bool isExpedMode = panelLights[49] > std::numeric_limits<float>::epsilon();  // EXPED Light (A319, A320, A321)
+        bool isAltMode339 = panelLights[51] > std::numeric_limits<float>::epsilon(); // ALT Light (A330, A340, A350, A380)
+        product->setLedBrightness(FCUEfisLed::EXPED_GREEN, isExpedMode || isAltMode339);
+    },
+        this);
 
     // Monitor EFIS Right (Captain) LED states
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/FD2Engage", [this, product](bool engaged) {
         product->setLedBrightness(FCUEfisLed::EFISR_FD_GREEN, engaged || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/ILSonFO", [this, product](bool on) {
         product->setLedBrightness(FCUEfisLed::EFISR_LS_GREEN, on || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/NDShowCSTRFO", [this, product](bool show) {
         product->setLedBrightness(FCUEfisLed::EFISR_CSTR_GREEN, show || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/NDShowWPTFO", [this, product](bool show) {
         product->setLedBrightness(FCUEfisLed::EFISR_WPT_GREEN, show || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/NDShowVORDFO", [this, product](bool show) {
         product->setLedBrightness(FCUEfisLed::EFISR_VORD_GREEN, show || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/NDShowNDBFO", [this, product](bool show) {
         product->setLedBrightness(FCUEfisLed::EFISR_NDB_GREEN, show || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/NDShowARPTFO", [this, product](bool show) {
         product->setLedBrightness(FCUEfisLed::EFISR_ARPT_GREEN, show || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     // Monitor EFIS Left (First Officer) LED states
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/FD1Engage", [this, product](bool engaged) {
         product->setLedBrightness(FCUEfisLed::EFISL_FD_GREEN, engaged || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/ILSonCapt", [this, product](bool on) {
         product->setLedBrightness(FCUEfisLed::EFISL_LS_GREEN, on || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/NDShowCSTRCapt", [this, product](bool show) {
         product->setLedBrightness(FCUEfisLed::EFISL_CSTR_GREEN, show || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/NDShowWPTCapt", [this, product](bool show) {
         product->setLedBrightness(FCUEfisLed::EFISL_WPT_GREEN, show || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/NDShowVORDCapt", [this, product](bool show) {
         product->setLedBrightness(FCUEfisLed::EFISL_VORD_GREEN, show || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/NDShowNDBCapt", [this, product](bool show) {
         product->setLedBrightness(FCUEfisLed::EFISL_NDB_GREEN, show || isAnnunTest() ? 1 : 0);
-    });
+    },
+        this);
 
     Dataref::getInstance()->monitorExistingDataref<bool>("AirbusFBW/NDShowARPTCapt", [this, product](bool show) {
         product->setLedBrightness(FCUEfisLed::EFISL_ARPT_GREEN, show || isAnnunTest() ? 1 : 0);
-    });
-}
-
-TolissFCUEfisProfile::~TolissFCUEfisProfile() {
-    Dataref::getInstance()->unbind("AirbusFBW/SupplLightLevelRehostats");
-    Dataref::getInstance()->unbind("AirbusFBW/FCUAvail");
-    Dataref::getInstance()->unbind("AirbusFBW/AnnunMode");
-
-    // Unbind FCU datarefs
-    Dataref::getInstance()->unbind("AirbusFBW/AP1Engage");
-    Dataref::getInstance()->unbind("AirbusFBW/AP2Engage");
-    Dataref::getInstance()->unbind("AirbusFBW/ATHRmode");
-    Dataref::getInstance()->unbind("AirbusFBW/LOCilluminated");
-    Dataref::getInstance()->unbind("AirbusFBW/APPRilluminated");
-    Dataref::getInstance()->unbind("AirbusFBW/APVerticalMode");
-
-    // Unbind EFIS Right datarefs
-    Dataref::getInstance()->unbind("AirbusFBW/FD2Engage");
-    Dataref::getInstance()->unbind("AirbusFBW/ILSonFO");
-    Dataref::getInstance()->unbind("AirbusFBW/NDShowCSTRFO");
-    Dataref::getInstance()->unbind("AirbusFBW/NDShowWPTFO");
-    Dataref::getInstance()->unbind("AirbusFBW/NDShowVORDFO");
-    Dataref::getInstance()->unbind("AirbusFBW/NDShowNDBFO");
-    Dataref::getInstance()->unbind("AirbusFBW/NDShowARPTFO");
-
-    // Unbind EFIS Left datarefs
-    Dataref::getInstance()->unbind("AirbusFBW/FD1Engage");
-    Dataref::getInstance()->unbind("AirbusFBW/ILSonCapt");
-    Dataref::getInstance()->unbind("AirbusFBW/NDShowCSTRCapt");
-    Dataref::getInstance()->unbind("AirbusFBW/NDShowWPTCapt");
-    Dataref::getInstance()->unbind("AirbusFBW/NDShowVORDCapt");
-    Dataref::getInstance()->unbind("AirbusFBW/NDShowNDBCapt");
-    Dataref::getInstance()->unbind("AirbusFBW/NDShowARPTCapt");
+    },
+        this);
 }
 
 bool TolissFCUEfisProfile::IsEligible() {
@@ -205,6 +201,7 @@ const std::vector<std::string> &TolissFCUEfisProfile::displayDatarefs() const {
         "AirbusFBW/HDGdashed",
 
         "sim/cockpit/autopilot/altitude",
+        "toliss_airbus/pfdoutputs/general/ap_altitude_reference",
         "AirbusFBW/ALTmanaged",
 
         "sim/cockpit/autopilot/vertical_velocity",
@@ -332,12 +329,12 @@ void TolissFCUEfisProfile::updateDisplayData(FCUDisplayData &data) {
     data.displayEnabled = datarefManager->getCached<bool>("AirbusFBW/FCUAvail");
     data.displayTest = isAnnunTest(true);
 
-    // Set managed mode indicators - using validated int datarefs (1 or 0)
+    // Set managed mode indicators
     data.spdManaged = datarefManager->getCached<bool>("AirbusFBW/SPDmanaged");
     data.hdgManaged = datarefManager->getCached<bool>("AirbusFBW/HDGmanaged");
     data.altManaged = datarefManager->getCached<bool>("AirbusFBW/ALTmanaged");
 
-    // Speed/Mach mode - using sim/cockpit/autopilot/airspeed_is_mach (int, 1 or 0)
+    // Speed/Mach mode
     data.spdMach = datarefManager->getCached<bool>("sim/cockpit/autopilot/airspeed_is_mach");
     float speed = datarefManager->getCached<float>("sim/cockpit2/autopilot/airspeed_dial_kts_mach");
 
@@ -356,7 +353,7 @@ void TolissFCUEfisProfile::updateDisplayData(FCUDisplayData &data) {
         data.speed = "---";
     }
 
-    // Format FCU heading display - using sim/cockpit/autopilot/heading_mag (float)
+    // Format FCU heading display
     float heading = datarefManager->getCached<float>("sim/cockpit/autopilot/heading_mag");
     if (heading >= 0 && datarefManager->getCached<bool>("AirbusFBW/HDGdashed") == false) {
         // Convert 360 to 0 for display
@@ -368,8 +365,8 @@ void TolissFCUEfisProfile::updateDisplayData(FCUDisplayData &data) {
         data.heading = "---";
     }
 
-    // Format FCU altitude display - using sim/cockpit/autopilot/altitude (float)
-    float altitude = datarefManager->getCached<float>("sim/cockpit/autopilot/altitude");
+    // Format FCU altitude display
+    float altitude = datarefManager->getCached<float>("toliss_airbus/pfdoutputs/general/ap_altitude_reference");
     if (altitude >= 0) {
         int altInt = static_cast<int>(altitude);
         std::stringstream ss;
@@ -380,14 +377,15 @@ void TolissFCUEfisProfile::updateDisplayData(FCUDisplayData &data) {
         data.altitude = "-----";
     }
 
-    // Format vertical speed display - using sim/cockpit/autopilot/vertical_velocity (float)
+    // Format vertical speed display
     float vs = datarefManager->getCached<float>("sim/cockpit/autopilot/vertical_velocity");
     bool vsDashed = datarefManager->getCached<bool>("AirbusFBW/VSdashed");
 
-    // HDG/TRK mode - using AirbusFBW/HDGTRKmode (int, HDG=0, TRK=1)
-    data.hdgTrk = datarefManager->getCached<bool>("AirbusFBW/HDGTRKmode");
-    data.vsMode = !data.hdgTrk; // VS mode when HDG mode
-    data.fpaMode = data.hdgTrk; // FPA mode when TRK mode
+    // HDG/TRK mode
+    data.headingTrk = datarefManager->getCached<bool>("AirbusFBW/HDGTRKmode");
+    data.headingHdg = !data.headingTrk;
+    data.vsMode = !data.headingTrk; // VS mode when HDG mode
+    data.fpaMode = data.headingTrk; // FPA mode when TRK mode
 
     if (vsDashed) {
         // When dashed, show 5 dashes with minus sign
@@ -445,7 +443,7 @@ void TolissFCUEfisProfile::updateDisplayData(FCUDisplayData &data) {
     data.vsVerticalLine = data.vsMode && (data.verticalSpeed != "-----");
 
     // LAT mode - Typically always on for Airbus
-    data.latMode = true;
+    data.headingLat = true;
 
     for (int i = 0; i < 2; i++) {
         bool isCaptain = i == 0;
@@ -512,8 +510,6 @@ void TolissFCUEfisProfile::buttonPressed(const FCUEfisButtonDef *button, XPLMCom
         } else {
             datarefManager->set<float>(button->dataref.c_str(), button->value);
         }
-
-        return;
     } else if (phase == xplm_CommandBegin && button->datarefType == FCUEfisDatarefType::EXECUTE_CMD_ONCE) {
         datarefManager->executeCommand(button->dataref.c_str());
     }
